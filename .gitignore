@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.vite-dev.log
+.vite-dev.err.log
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/*.exe
+src-tauri/*.dll
+src-tauri/*.so
+src-tauri/*.dylib
+src-tauri/icons/
+!src-tauri/icons/.gitkeep
+tauri.conf.json.bak
+
+
+# Misc
+*.tsbuildinfo
+
+# Build artifacts (large binaries)
+dist-electron/
+test-results/
+
+# Internal / generated
+generated-icons/
+agent_talk.md
+
+# Environment & secrets
+.env
+.env.*
+*.log

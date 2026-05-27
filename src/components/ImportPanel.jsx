@@ -1,0 +1,273 @@
+import { useState, useEffect } from "react";
+import { FileSpreadsheet, Upload, CheckCircle, AlertCircle, X } from "lucide-react";
+
+export default function ImportPanel({ visible, onImported }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [selectedPath, setSelectedPath] = useState("");
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [importSuccess, setImportSuccess] = useState(null);
+  const [error, setError] = useState("");
+  const isDesktopMode = Boolean(
+    window.electronAPI?.openFileDialog
+      && window.electronAPI?.previewStatement
+      && window.electronAPI?.importStatement
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadAccounts = async () => {
+      try {
+        const electronAccounts = await window.electronAPI?.getAccounts?.();
+        const nextAccounts = electronAccounts || [];
+
+        if (isMounted) {
+          setAccounts(nextAccounts);
+          setSelectedAccountId((current) => current || nextAccounts[0]?.id || "");
+        }
+      } catch {
+        if (isMounted) {
+          setAccounts([]);
+          setSelectedAccountId("");
+        }
+      }
+    };
+
+    loadAccounts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
+
+  if (!visible) {
+    return null;
+  }
+
+  const handleFileSelect = async () => {
+    setError("");
+    setResult(null);
+    setImportSuccess(null);
+
+    try {
+      if (!isDesktopMode) {
+        setError("การนำเข้าไฟล์และฐานข้อมูล SQLite ใช้ได้เฉพาะเมื่อเปิดผ่าน Electron desktop app หรือไฟล์ .exe");
+        return;
+      }
+
+      const selected = await window.electronAPI?.openFileDialog();
+
+      if (!selected) return;
+
+      setIsLoading(true);
+
+      const parseResult = await window.electronAPI.previewStatement(selected);
+
+      const fileName = selected.split(/[\\/]/).pop() || selected;
+
+      if (parseResult?.success) {
+        setSelectedPath(selected);
+        setSelectedFileName(fileName);
+        setResult({
+          transactions: parseResult.transactions || [],
+          count: parseResult.count ?? parseResult.transactions?.length ?? 0,
+          encoding_used: parseResult.encoding_used || "อัตโนมัติ",
+          detected_bank: parseResult.detected_bank || "อัตโนมัติ",
+        });
+      } else {
+        setError(parseResult?.error || "ไม่สามารถอ่านไฟล์ได้");
+      }
+    } catch (e) {
+      const msg = e?.message || String(e);
+      setError("เกิดข้อผิดพลาด: " + msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!result || !selectedPath || !selectedAccountId) {
+      setError("กรุณาเลือกไฟล์และบัญชีปลายทางก่อนนำเข้า หากยังไม่มีบัญชีให้เพิ่มในเมนูบัญชีและกระเป๋า");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    setImportSuccess(null);
+
+    try {
+      if (!isDesktopMode) {
+        throw new Error("โหมดนี้ต้องรันผ่าน Electron เพื่อบันทึกข้อมูลจริง");
+      }
+
+      const importResult = await window.electronAPI.importStatement({
+        filePath: selectedPath,
+        accountId: selectedAccountId,
+      });
+
+      if (!importResult?.success) {
+        throw new Error(importResult?.error || "ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้");
+      }
+
+      const selectedAcc = accounts.find(a => a.id === selectedAccountId);
+
+      setImportSuccess({
+        imported: importResult.imported || 0,
+        skipped: importResult.skipped || 0,
+        accountName: selectedAcc?.name || "บัญชีที่เลือก",
+      });
+
+      setResult(null);
+      setSelectedPath("");
+      setSelectedFileName("");
+      onImported?.();
+    } catch (e) {
+      setError("เกิดข้อผิดพลาด: " + (e?.message || String(e)));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCloseResult = () => {
+    setResult(null);
+    setSelectedPath("");
+    setSelectedFileName("");
+    setImportSuccess(null);
+    setError("");
+  };
+
+  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+
+  return (
+    <section className="import-panel">
+      <div className="import-copy">
+        <Upload size={21} />
+        <div>
+          <strong>นำเข้าข้อมูลจริงจาก Statement</strong>
+          <span>
+            {isDesktopMode
+              ? "รองรับ CSV และ Excel .xlsx จากธนาคารไทย — ทำงานแบบ Offline 100% (ไม่มีข้อมูลส่งออกนอกเครื่อง)"
+              : "โหมด Browser preview แสดง Dashboard ได้ แต่การนำเข้าไฟล์ต้องเปิดผ่าน Electron desktop app"}
+          </span>
+        </div>
+      </div>
+
+      <div className="import-actions">
+        <button type="button" onClick={handleFileSelect} disabled={isLoading || !isDesktopMode || accounts.length === 0}>
+          <FileSpreadsheet size={17} />
+          {isLoading ? "กำลังอ่านไฟล์..." : isDesktopMode ? "เลือกไฟล์ CSV / XLSX" : "เปิดผ่าน Electron เพื่อเลือกไฟล์"}
+        </button>
+      </div>
+
+      {!isDesktopMode && (
+        <div className="import-warning">
+          <AlertCircle size={16} />
+          เปิดด้วย `npm run electron:dev` หรือไฟล์ `.exe` เพื่อใช้ import, SQLite และระบบ offline จริง
+        </div>
+      )}
+
+      {isDesktopMode && accounts.length === 0 && (
+        <div className="import-warning">
+          <AlertCircle size={16} />
+          เพิ่มบัญชีธนาคารหรือบัญชีเงินสดก่อน จึงจะนำเข้า statement ได้
+        </div>
+      )}
+
+      {/* เลือกบัญชีปลายทาง */}
+      {accounts.length > 0 && (
+        <div className="import-account-select">
+          <label>นำเข้าลงบัญชี:</label>
+          <select 
+            value={selectedAccountId} 
+            onChange={(e) => setSelectedAccountId(e.target.value)}
+            disabled={isLoading || !!result}
+          >
+            {accounts.map(acc => (
+              <option key={acc.id} value={acc.id}>
+                {acc.institution ? `${acc.name} · ${acc.institution}` : acc.name} (คงเหลือ ฿{(acc.current_balance / 100).toLocaleString("th-TH")})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {error && (
+        <div className="import-error">
+          <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* แสดงผลสำเร็จหลังนำเข้า */}
+      {importSuccess && (
+        <div className="import-success">
+          <div className="success-header">
+            <CheckCircle size={20} />
+            <strong>นำเข้าสำเร็จ!</strong>
+          </div>
+          <div className="success-details">
+            นำเข้า <strong>{importSuccess.imported}</strong> รายการ ลงใน <strong>{importSuccess.accountName}</strong><br />
+            ข้ามรายการซ้ำ: {importSuccess.skipped} รายการ
+          </div>
+          <button className="close-success" onClick={() => setImportSuccess(null)}>
+            <X size={14} /> ปิด
+          </button>
+        </div>
+      )}
+
+      {/* ผลการวิเคราะห์ไฟล์ + ปุ่มนำเข้า */}
+      {result && (
+        <div className="import-result">
+          <div className="result-header">
+            <CheckCircle size={18} className="success" />
+            <strong>วิเคราะห์ไฟล์สำเร็จ</strong>
+            <span className="file-name">{selectedFileName}</span>
+            <span className="count">{result.count ?? result.transactions.length} รายการ</span>
+            <button className="close-preview" onClick={handleCloseResult} title="ปิด">
+              <X size={14} />
+            </button>
+          </div>
+
+          <div className="result-meta">
+            Encoding: {result.encoding_used} • ตรวจพบ: {result.detected_bank || "อัตโนมัติ"}
+            {selectedAccount && <> • ปลายทาง: <strong>{selectedAccount.name}</strong></>}
+          </div>
+
+          {result.transactions.length > 0 && (
+            <div className="preview-list">
+              <div className="preview-title">พรีวิว 5 รายการแรกจากไฟล์จริง (จะถูกจัดหมวดหมู่อัตโนมัติจากกฎที่คุณตั้งไว้):</div>
+              {result.transactions.slice(0, 5).map((tx, idx) => (
+                <div key={idx} className="preview-row">
+                  <span className="date">{tx.date}</span>
+                  <span className="title">{tx.title}</span>
+                  <span className="category">{tx.category_label || "อื่น ๆ"}</span>
+                  <span className={tx.amount >= 0 ? "amount in" : "amount out"}>
+                    {tx.amount >= 0 ? "+" : ""}{tx.amount.toLocaleString("th-TH")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button 
+            className="import-confirm-btn" 
+            onClick={handleImport}
+            disabled={isLoading || !selectedAccountId}
+          >
+            {isLoading ? "กำลังนำเข้าข้อมูล..." : "นำเข้าข้อมูลลงฐานข้อมูล (บันทึกถาวร)"}
+          </button>
+
+          <div className="import-note">
+            ระบบจะใช้กฎจัดหมวดหมู่ที่คุณตั้งไว้ (เช่น BIG C → อาหาร) และป้องกันการนำเข้าซ้ำโดยอัตโนมัติ
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
