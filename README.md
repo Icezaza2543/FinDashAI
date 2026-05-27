@@ -1,132 +1,148 @@
-# FinDash AI
+# 💰 FinDash AI
 
-FinDash AI เป็นแอปเดสก์ท็อปแบบ offline สำหรับจัดการการเงินส่วนบุคคลบน Windows ด้วย React + Electron
+> **แอปเดสก์ท็อปจัดการการเงินส่วนบุคคลแบบ Offline 100%**  
+> รองรับสเตทเมนต์ธนาคารไทย • เก็บข้อมูลทั้งหมดในเครื่องด้วย SQLite
 
-## สถานะปัจจุบัน
+<p align="center">
+  <a href="https://github.com/Icezaza2543/FinDashAI/stargazers"><img src="https://img.shields.io/github/stars/Icezaza2543/FinDashAI?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/Icezaza2543/FinDashAI/issues"><img src="https://img.shields.io/github/issues/Icezaza2543/FinDashAI" alt="Issues"></a>
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=flat&logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/Electron-42-47848F?style=flat&logo=electron&logoColor=white" alt="Electron">
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Version-0.3.0-3b82f6?style=flat" alt="Version">
+</p>
 
-- รันเป็น Electron desktop app ได้
-- นำเข้า statement จากไฟล์ `.csv` และ `.xlsx`
-- บันทึกข้อมูลลง SQLite local database ผ่าน Electron main process
-- มี dedupe จาก fingerprint เพื่อป้องกัน import ซ้ำ
-- มี rule-based categorization พื้นฐาน
-- Dashboard อ่าน accounts/transactions/profile จาก local database เท่านั้น ไม่มีข้อมูลจำลองสำรอง
-- เพิ่ม แก้ไข และลบบัญชีได้จริง รวมถึงชื่อบัญชี ธนาคาร/สถาบัน ประเภท และยอดคงเหลือ
-- แก้ไขโปรไฟล์ผู้ใช้ได้จริงผ่าน SQLite
-- เพิ่ม แก้ไข และลบงบประมาณกับเป้าหมายออมได้จริง
-- ไม่ใช้ Tauri/Rust แล้ว
+---
 
-## Prerequisites
+## ✨ คุณสมบัติเด่น
 
-- Node.js >= 20
-- Windows สำหรับการ build `.exe`
+<table>
+<tr>
+<td width="50%" valign="top">
 
-## ติดตั้ง
+**🔒 Offline 100%**  
+ข้อมูลทั้งหมดอยู่ในเครื่อง ไม่มีเซิร์ฟเวอร์ ไม่ส่งข้อมูลออก
+
+**📥 นำเข้าสเตทเมนต์ไทย**  
+รองรับ CSV และ XLSX จากธนาคารไทย (รวม TIS-620 / Windows-874)
+
+**🛡️ ป้องกันข้อมูลซ้ำ**  
+ระบบ Fingerprint ตรวจจับรายการที่นำเข้าแล้วโดยอัตโนมัติ
+
+**🏦 จัดการหลายบัญชี**  
+เพิ่ม แก้ไข ลบ บัญชีธนาคาร/สถาบัน พร้อมยอดคงเหลือจริง
+
+</td>
+<td width="50%" valign="top">
+
+**📊 งบประมาณ + เป้าหมายออม**  
+ตั้งงบประมาณรายหมวดและเป้าหมายการออมได้เต็มรูปแบบ
+
+**📈 Dashboard เรียลไทม์**  
+กราฟกระแสเงินสด โดนัทค่าใช้จ่าย และข้อมูลเชิงลึก
+
+**🧠 Categorization อัจฉริยะ**  
+หมวดหมู่อัตโนมัติ + สามารถกำหนดกฎเองได้
+
+**📤 Export ข้อมูล**  
+ส่งออกธุรกรรมเป็น CSV ได้ตลอดเวลา
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 Quick Start
 
 ```bash
 npm install
+npm run electron:dev     # เปิดเป็นแอปเดสก์ท็อป (แนะนำ)
 ```
 
-## Development
+หรือเปิดเฉพาะเว็บ UI ด้วย `npm run dev`
 
-รัน web UI อย่างเดียว:
+---
 
-```bash
-npm run dev
+## 📸 ภาพตัวอย่าง
+
+> **ยังไม่มีภาพหน้าจอ**  
+> หากคุณลองใช้แล้ว ช่วยแคปภาพการใช้งานจริงแล้วส่ง Pull Request มาได้เลยครับ (แนะนำเก็บที่ `docs/screenshots/`)
+
+---
+
+## 🛠 เทคโนโลยีที่ใช้
+
+| ส่วน | เทคโนโลยี |
+|------|-----------|
+| **Frontend** | React 19 + Vite |
+| **Desktop** | Electron 42 |
+| **ฐานข้อมูล** | SQLite (เก็บในเครื่อง) |
+| **Parser** | papaparse • read-excel-file • iconv-lite |
+| **Build** | electron-builder |
+
+---
+
+## 📁 โครงสร้างโปรเจกต์
+
+```
+FinDashAI/
+├── electron/          # Main process, SQLite, Statement Parser
+├── src/               # React Components + UI
+├── scripts/           # Build utilities
+└── public/            # Icons และ static assets
 ```
 
-เปิดที่ `http://127.0.0.1:5173`
+---
 
-รัน Electron desktop app:
+## 🔐 ความเป็นส่วนตัว
 
-```bash
-npm run electron:dev
-```
+> [!IMPORTANT]
+>
+> FinDash AI ถูกออกแบบมาเพื่อความเป็นส่วนตัวสูงสุดตั้งแต่แรก
+>
+> - ไฟล์ฐานข้อมูล `findash.sqlite` อยู่ในโฟลเดอร์ User Data ของผู้ใช้
+> - **ไม่มีการเชื่อมต่ออินเทอร์เน็ต** จากตัวแอปเลย
+> - Renderer ถูกแยกชั้นความปลอดภัย (`contextIsolation: true`)
 
-สคริปต์นี้จะรัน Vite และ Electron พร้อมกัน โดยรอ port `5173` ก่อนเปิด desktop window
+---
 
-## Build
-
-Build renderer:
-
-```bash
-npm run build
-```
-
-Build Windows installer:
+## 📦 การ Build
 
 ```bash
 npm run build:exe
 ```
 
-ไฟล์ installer จะถูกสร้างใน `dist-electron/`
+ไฟล์ติดตั้ง Windows จะถูกสร้างที่ `dist-electron/`
 
-## Available Scripts
+---
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start Vite dev server |
-| `npm run electron:dev` | Start Vite + Electron desktop app |
-| `npm run build` | Build renderer assets |
-| `npm run electron:build` | Build renderer and package Electron app |
-| `npm run build:exe` | Alias for Electron packaging |
-| `npm run preview` | Preview built renderer |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Format source files |
-| `npm run smoke:production` | Smoke test parser + SQLite + dedupe with Electron runtime |
+## 📍 สถานะปัจจุบัน
 
-## Project Structure
+- ✅ ใช้งานจริงได้ในโหมด Desktop (Windows)
+- ✅ Import CSV/XLSX + Deduplication
+- ✅ CRUD บัญชี, งบประมาณ, เป้าหมาย, โปรไฟล์
+- 🔄 กำลังพัฒนาเพิ่มเติม (Roadmap จะอัปเดตในอนาคต)
 
-```text
-electron/
-  main.js              Electron main process + IPC handlers
-  preload.js           Safe renderer bridge
-  database.js          SQLite schema, seed data, import persistence
-  statementParser.js   CSV/XLSX parsing, date/amount normalization
-scripts/
-  start-electron.cjs   Electron launcher that clears ELECTRON_RUN_AS_NODE
-src/
-  components/          React UI components
-  data/                Static filter and navigation options
-  utils/               Formatting helpers
-  App.jsx              Main dashboard
-```
+---
 
-## Local Data
+## 🤝 การมีส่วนร่วม
 
-SQLite database is stored under Electron `app.getPath("userData")` as `findash.sqlite`.
+ยินดีต้อนรับทุก Pull Request และไอเดีย!
 
-The default schema includes:
+ก่อนส่งโค้ด กรุณา:
+- รัน `npm run lint` และ `npm run build` ให้ผ่าน
+- เขียนโค้ดให้อ่านง่ายและสอดคล้องกับสไตล์ที่มีอยู่
 
-- `accounts`
-- `user_profile`
-- `budgets`
-- `goals`
-- `categories`
-- `category_rules`
-- `import_batches`
-- `transactions`
+---
 
-## Import Notes
+## 📜 สัญญาอนุญาต
 
-- CSV supports UTF-8 and TIS-620/Windows-874 detection.
-- Excel support is intentionally limited to `.xlsx`.
-- Legacy `.xls` is not enabled for production safety.
-- Duplicate transactions are skipped by fingerprint: account + date + normalized title + amount.
+โปรเจกต์นี้เผยแพร่ภายใต้ **MIT License**
 
-## Verification
+---
 
-Recommended checks before packaging:
-
-```bash
-npm run lint
-npm run build
-npm run smoke:production
-npm audit --omit=dev
-```
-
-## Production Notes
-
-- Electron renderer has `contextIsolation: true` and `nodeIntegration: false`.
-- Renderer talks to backend only through `window.electronAPI`.
-- Content Security Policy is defined in `index.html`.
-- Tauri/Rust files and dependencies have been removed from the production path.
+<p align="center">
+  <sub>สร้างด้วย ❤️ สำหรับคนที่อยากควบคุมการเงินของตัวเองแบบออฟไลน์แท้จริง</sub>
+</p>
