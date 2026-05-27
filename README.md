@@ -11,6 +11,7 @@
   <img src="https://img.shields.io/badge/Electron-42-47848F?style=flat&logo=electron&logoColor=white" alt="Electron">
   <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat&logo=vite&logoColor=white" alt="Vite">
   <img src="https://img.shields.io/badge/Version-0.3.0-3b82f6?style=flat" alt="Version">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License: MIT"></a>
 </p>
 
 ---
@@ -67,8 +68,22 @@ npm run electron:dev     # เปิดเป็นแอปเดสก์ท�
 
 ## 📸 ภาพตัวอย่าง
 
-> **ยังไม่มีภาพหน้าจอ**  
-> หากคุณลองใช้แล้ว ช่วยแคปภาพการใช้งานจริงแล้วส่ง Pull Request มาได้เลยครับ (แนะนำเก็บที่ `docs/screenshots/`)
+<p align="center">
+  <strong>ตัวอย่างการใช้งานจริง (แนะนำ 3-4 ภาพ)</strong>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/01-dashboard.png" width="31%" alt="Dashboard" />
+  <img src="docs/screenshots/02-import.png" width="31%" alt="Import Statement" />
+  <img src="docs/screenshots/03-budgets-goals.png" width="31%" alt="Budgets & Goals" />
+</p>
+
+<p align="center">
+  <sub>
+    💡 วิธีเพิ่มภาพ: วางไฟล์ PNG/JPG ไว้ที่ <code>docs/screenshots/</code><br>
+    แล้วอัปเดต path ในตารางด้านบน (แนะนำภาพขนาด 1200-1600px กว้าง)
+  </sub>
+</p>
 
 ---
 
@@ -139,7 +154,7 @@ npm run build:exe
 
 ## 📜 สัญญาอนุญาต
 
-โปรเจกต์นี้เผยแพร่ภายใต้ **MIT License**
+โปรเจกต์นี้เผยแพร่ภายใต้สัญญาอนุญาต **[MIT License](LICENSE)**
 
 ---
 
