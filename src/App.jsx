@@ -15,6 +15,7 @@ import ProfitabilityPanel from "./components/ProfitabilityPanel";
 
 import { ranges, navItems } from "./data/filters";
 import { formatMoney } from "./utils/formatters";
+import financeStore from "./lib/financeStore";
 
 const CATEGORY_LABEL_MAP = {
   "cat-income": "รายได้ประจำ",
@@ -133,31 +134,17 @@ export default function App() {
   const [budgetDrafts, setBudgetDrafts] = useState({});
   const [goalDrafts, setGoalDrafts] = useState({});
 
-  const isDesktopMode = Boolean(window.electronAPI?.getAccounts && window.electronAPI?.createAccount);
-
   useEffect(() => {
     let isMounted = true;
 
     const loadRealData = async () => {
       try {
-        const api = window.electronAPI;
-        if (!api?.getAccounts || !api?.getTransactions) {
-          if (isMounted) {
-            setRealAccounts([]);
-            setRealBudgets([]);
-            setRealGoals([]);
-            setAllTransactions([]);
-            setUserProfile(EMPTY_PROFILE);
-          }
-          return;
-        }
-
         const [accs, budgets, goals, txs, profile] = await Promise.all([
-          api.getAccounts().catch(() => []),
-          api.getBudgets ? api.getBudgets().catch(() => []) : Promise.resolve([]),
-          api.getGoals ? api.getGoals().catch(() => []) : Promise.resolve([]),
-          api.getTransactions({ filter: null }).catch(() => []),
-          api.getUserProfile ? api.getUserProfile().catch(() => EMPTY_PROFILE) : Promise.resolve(EMPTY_PROFILE),
+          financeStore.getAccounts().catch(() => []),
+          financeStore.getBudgets ? financeStore.getBudgets().catch(() => []) : Promise.resolve([]),
+          financeStore.getGoals ? financeStore.getGoals().catch(() => []) : Promise.resolve([]),
+          financeStore.getTransactions().catch(() => []),
+          financeStore.getUserProfile ? financeStore.getUserProfile().catch(() => EMPTY_PROFILE) : Promise.resolve(EMPTY_PROFILE),
         ]);
 
         if (isMounted) {
@@ -168,7 +155,7 @@ export default function App() {
           setUserProfile({ ...EMPTY_PROFILE, ...(profile || {}) });
         }
       } catch (error) {
-        console.warn("โหลดข้อมูลจากฐานข้อมูลไม่ได้", error);
+        console.warn("โหลดข้อมูลจาก local storage ไม่ได้", error);
         if (isMounted) {
           setRealAccounts([]);
           setRealBudgets([]);
@@ -326,7 +313,7 @@ export default function App() {
 
   const handleRefresh = () => {
     setRefreshCount((count) => count + 1);
-    showNote("รีเฟรชข้อมูลจาก SQLite แล้ว", 1800);
+    showNote("รีเฟรชข้อมูลจาก local storage แล้ว", 1800);
   };
 
   const handleImportComplete = () => {
@@ -346,19 +333,12 @@ export default function App() {
 
   const handleExport = async () => {
     try {
-      if (!window.electronAPI?.exportTransactions) {
-        showNote("เปิดผ่าน Electron เพื่อ export เป็น CSV");
-        return;
-      }
-
-      const result = await window.electronAPI.exportTransactions();
+      const result = await financeStore.exportTransactions();
       if (result?.canceled) return;
-
       if (!result?.success) {
         showNote(result?.error || "Export ไม่สำเร็จ");
         return;
       }
-
       showNote(`Export ${result.count} รายการเป็น CSV แล้ว`);
     } catch (error) {
       showNote(error?.message || "Export ไม่สำเร็จ");
@@ -377,12 +357,7 @@ export default function App() {
     event.preventDefault();
 
     try {
-      if (!window.electronAPI?.updateUserProfile) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อบันทึกโปรไฟล์");
-        return;
-      }
-
-      const saved = await window.electronAPI.updateUserProfile(profileDraft);
+      const saved = await financeStore.updateUserProfile(profileDraft);
       setUserProfile({ ...EMPTY_PROFILE, ...(saved || {}) });
       showNote("บันทึกโปรไฟล์แล้ว");
     } catch (error) {
@@ -394,12 +369,7 @@ export default function App() {
     event.preventDefault();
 
     try {
-      if (!window.electronAPI?.createAccount) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อบันทึกบัญชี");
-        return;
-      }
-
-      await window.electronAPI.createAccount({
+      await financeStore.createAccount({
         ...newAccountDraft,
         current_balance: bahtToSatang(newAccountDraft.current_balance),
       });
@@ -413,14 +383,8 @@ export default function App() {
 
   const saveAccount = async (id) => {
     try {
-      if (!window.electronAPI?.updateAccount) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อแก้ไขบัญชี");
-        return;
-      }
-
       const draft = accountDrafts[id];
-      await window.electronAPI.updateAccount({
-        id,
+      await financeStore.updateAccount(id, {
         ...draft,
         current_balance: bahtToSatang(draft.current_balance),
       });
@@ -433,15 +397,10 @@ export default function App() {
 
   const deleteAccount = async (id) => {
     try {
-      if (!window.electronAPI?.deleteAccount) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อลบบัญชี");
-        return;
-      }
-
       const ok = window.confirm("ลบบัญชีนี้หรือไม่? บัญชีที่มีธุรกรรมแล้วจะลบไม่ได้");
       if (!ok) return;
 
-      await window.electronAPI.deleteAccount(id);
+      await financeStore.deleteAccount(id);
       if (account === id) setAccount("all");
       refreshData();
       showNote("ลบบัญชีแล้ว");
@@ -454,12 +413,7 @@ export default function App() {
     event.preventDefault();
 
     try {
-      if (!window.electronAPI?.createBudget) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อบันทึกงบประมาณ");
-        return;
-      }
-
-      await window.electronAPI.createBudget({
+      await financeStore.createBudget({
         ...newBudgetDraft,
         monthly_limit: bahtToSatang(newBudgetDraft.monthly_limit),
       });
@@ -473,14 +427,8 @@ export default function App() {
 
   const saveBudget = async (id) => {
     try {
-      if (!window.electronAPI?.updateBudget) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อแก้ไขงบประมาณ");
-        return;
-      }
-
       const draft = budgetDrafts[id];
-      await window.electronAPI.updateBudget({
-        id,
+      await financeStore.updateBudget(id, {
         ...draft,
         monthly_limit: bahtToSatang(draft.monthly_limit),
       });
@@ -493,12 +441,7 @@ export default function App() {
 
   const deleteBudget = async (id) => {
     try {
-      if (!window.electronAPI?.deleteBudget) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อลบงบประมาณ");
-        return;
-      }
-
-      await window.electronAPI.deleteBudget(id);
+      await financeStore.deleteBudget(id);
       refreshData();
       showNote("ลบงบประมาณแล้ว");
     } catch (error) {
@@ -510,12 +453,7 @@ export default function App() {
     event.preventDefault();
 
     try {
-      if (!window.electronAPI?.createGoal) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อบันทึกเป้าหมาย");
-        return;
-      }
-
-      await window.electronAPI.createGoal({
+      await financeStore.createGoal({
         ...newGoalDraft,
         target_amount: bahtToSatang(newGoalDraft.target_amount),
         saved_amount: bahtToSatang(newGoalDraft.saved_amount),
@@ -530,14 +468,8 @@ export default function App() {
 
   const saveGoal = async (id) => {
     try {
-      if (!window.electronAPI?.updateGoal) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อแก้ไขเป้าหมาย");
-        return;
-      }
-
       const draft = goalDrafts[id];
-      await window.electronAPI.updateGoal({
-        id,
+      await financeStore.updateGoal(id, {
         ...draft,
         target_amount: bahtToSatang(draft.target_amount),
         saved_amount: bahtToSatang(draft.saved_amount),
@@ -551,12 +483,7 @@ export default function App() {
 
   const deleteGoal = async (id) => {
     try {
-      if (!window.electronAPI?.deleteGoal) {
-        showNote("ต้องเปิดผ่าน Electron เพื่อลบเป้าหมาย");
-        return;
-      }
-
-      await window.electronAPI.deleteGoal(id);
+      await financeStore.deleteGoal(id);
       refreshData();
       showNote("ลบเป้าหมายแล้ว");
     } catch (error) {
@@ -709,71 +636,65 @@ export default function App() {
               <div className="panel-header">
                 <div>
                   <h2>บัญชีและกระเป๋า</h2>
-                  <p>เพิ่ม แก้ไข หรือลบบัญชีที่บันทึกใน SQLite</p>
+                  <p>เพิ่ม แก้ไข หรือลบบัญชีที่บันทึกใน local browser storage</p>
                 </div>
               </div>
-              {!isDesktopMode ? (
-                <div className="panel-empty">เปิดผ่าน Electron เพื่อแก้ไขบัญชีจริง</div>
-              ) : (
-                <>
-                  <form className="editor-form" onSubmit={createAccount}>
-                    <h3>เพิ่มบัญชีใหม่</h3>
-                    {renderAccountForm(
-                      newAccountDraft,
-                      (field, value) => setNewAccountDraft((draft) => ({ ...draft, [field]: value })),
-                      "เพิ่มบัญชี",
-                    )}
-                  </form>
+              <form className="editor-form" onSubmit={createAccount}>
+                <h3>เพิ่มบัญชีใหม่</h3>
+                {renderAccountForm(
+                  newAccountDraft,
+                  (field, value) => setNewAccountDraft((draft) => ({ ...draft, [field]: value })),
+                  "เพิ่มบัญชี",
+                )}
+              </form>
 
-                  <div className="account-editor-list">
-                    {realAccounts.length === 0 ? (
-                      <div className="panel-empty">ยังไม่มีบัญชี เพิ่มบัญชีแรกเพื่อเริ่มนำเข้า statement</div>
-                    ) : (
-                      realAccounts.map((item) => {
-                        const draft = accountDrafts[item.id] || accountToDraft(item);
+              <div className="account-editor-list">
+                {realAccounts.length === 0 ? (
+                  <div className="panel-empty">ยังไม่มีบัญชี เพิ่มบัญชีแรกเพื่อเริ่มนำเข้า statement</div>
+                ) : (
+                  realAccounts.map((item) => {
+                    const draft = accountDrafts[item.id] || accountToDraft(item);
 
-                        return (
-                          <form
-                            className="account-editor-card"
-                            key={item.id}
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              saveAccount(item.id);
-                            }}
+                    return (
+                      <form
+                        className="account-editor-card"
+                        key={item.id}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          saveAccount(item.id);
+                        }}
+                      >
+                        <div className="account-card-heading">
+                          <div>
+                            <span>{ACCOUNT_TYPE_LABELS[item.type] || "บัญชี"}</span>
+                            <strong>{item.name}</strong>
+                          </div>
+                          <b>{formatMoney((item.current_balance || 0) / 100)}</b>
+                        </div>
+                        {renderAccountForm(
+                          draft,
+                          (field, value) =>
+                            setAccountDrafts((drafts) => ({
+                              ...drafts,
+                              [item.id]: { ...draft, [field]: value },
+                            })),
+                          "บันทึกบัญชี",
+                        )}
+                        <div className="editor-actions">
+                          <small>{item.institution || "ยังไม่ได้ระบุธนาคาร/สถาบัน"}</small>
+                          <button
+                            className="danger-button"
+                            type="button"
+                            onClick={() => deleteAccount(item.id)}
                           >
-                            <div className="account-card-heading">
-                              <div>
-                                <span>{ACCOUNT_TYPE_LABELS[item.type] || "บัญชี"}</span>
-                                <strong>{item.name}</strong>
-                              </div>
-                              <b>{formatMoney((item.current_balance || 0) / 100)}</b>
-                            </div>
-                            {renderAccountForm(
-                              draft,
-                              (field, value) =>
-                                setAccountDrafts((drafts) => ({
-                                  ...drafts,
-                                  [item.id]: { ...draft, [field]: value },
-                                })),
-                              "บันทึกบัญชี",
-                            )}
-                            <div className="editor-actions">
-                              <small>{item.institution || "ยังไม่ได้ระบุธนาคาร/สถาบัน"}</small>
-                              <button
-                                className="danger-button"
-                                type="button"
-                                onClick={() => deleteAccount(item.id)}
-                              >
-                                ลบบัญชี
-                              </button>
-                            </div>
-                          </form>
-                        );
-                      })
-                    )}
-                  </div>
-                </>
-              )}
+                            ลบบัญชี
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  })
+                )}
+              </div>
             </section>
           </>
         );
@@ -803,70 +724,64 @@ export default function App() {
                 <div className="panel-header">
                   <div>
                     <h2>ตั้งงบประมาณ</h2>
-                    <p>เพิ่ม แก้ไข หรือลบงบต่อหมวดจากฐานข้อมูลจริง</p>
+                    <p>เพิ่ม แก้ไข หรือลบงบต่อหมวดจาก local browser storage</p>
                   </div>
                 </div>
-                {!isDesktopMode ? (
-                  <div className="panel-empty">เปิดผ่าน Electron เพื่อแก้ไขงบประมาณจริง</div>
-                ) : (
-                  <>
-                    <form className="editor-form" onSubmit={createBudget}>
-                      <h3>เพิ่มงบใหม่</h3>
-                      {renderBudgetForm(
-                        newBudgetDraft,
-                        (field, value) => setNewBudgetDraft((draft) => ({ ...draft, [field]: value })),
-                        "เพิ่มงบ",
-                      )}
-                    </form>
-                    <div className="account-editor-list">
-                      {realBudgets.length === 0 ? (
-                        <div className="panel-empty">ยังไม่มีงบประมาณ เพิ่มหมวดแรกเพื่อเริ่มติดตาม</div>
-                      ) : (
-                        realBudgets.map((item) => {
-                          const draft = budgetDrafts[item.id] || budgetToDraft(item);
+                <form className="editor-form" onSubmit={createBudget}>
+                  <h3>เพิ่มงบใหม่</h3>
+                  {renderBudgetForm(
+                    newBudgetDraft,
+                    (field, value) => setNewBudgetDraft((draft) => ({ ...draft, [field]: value })),
+                    "เพิ่มงบ",
+                  )}
+                </form>
+                <div className="account-editor-list">
+                  {realBudgets.length === 0 ? (
+                    <div className="panel-empty">ยังไม่มีงบประมาณ เพิ่มหมวดแรกเพื่อเริ่มติดตาม</div>
+                  ) : (
+                    realBudgets.map((item) => {
+                      const draft = budgetDrafts[item.id] || budgetToDraft(item);
 
-                          return (
-                            <form
-                              className="account-editor-card"
-                              key={item.id}
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                saveBudget(item.id);
-                              }}
+                      return (
+                        <form
+                          className="account-editor-card"
+                          key={item.id}
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            saveBudget(item.id);
+                          }}
+                        >
+                          <div className="account-card-heading">
+                            <div>
+                              <span>งบต่อเดือน</span>
+                              <strong>{item.category_label}</strong>
+                            </div>
+                            <b>{formatMoney((item.monthly_limit || 0) / 100)}</b>
+                          </div>
+                          {renderBudgetForm(
+                            draft,
+                            (field, value) =>
+                              setBudgetDrafts((drafts) => ({
+                                ...drafts,
+                                [item.id]: { ...draft, [field]: value },
+                              })),
+                            "บันทึกงบ",
+                          )}
+                          <div className="editor-actions">
+                            <small>หมวด {item.category_label}</small>
+                            <button
+                              className="danger-button"
+                              type="button"
+                              onClick={() => deleteBudget(item.id)}
                             >
-                              <div className="account-card-heading">
-                                <div>
-                                  <span>งบต่อเดือน</span>
-                                  <strong>{item.category_label}</strong>
-                                </div>
-                                <b>{formatMoney((item.monthly_limit || 0) / 100)}</b>
-                              </div>
-                              {renderBudgetForm(
-                                draft,
-                                (field, value) =>
-                                  setBudgetDrafts((drafts) => ({
-                                    ...drafts,
-                                    [item.id]: { ...draft, [field]: value },
-                                  })),
-                                "บันทึกงบ",
-                              )}
-                              <div className="editor-actions">
-                                <small>หมวด {item.category_label}</small>
-                                <button
-                                  className="danger-button"
-                                  type="button"
-                                  onClick={() => deleteBudget(item.id)}
-                                >
-                                  ลบงบ
-                                </button>
-                              </div>
-                            </form>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                )}
+                              ลบงบ
+                            </button>
+                          </div>
+                        </form>
+                      );
+                    })
+                  )}
+                </div>
               </section>
               <BudgetPanel budgets={realBudgets} transactions={analyticTransactions} />
               <ExpenseDonut transactions={analyticTransactions} />
@@ -880,80 +795,74 @@ export default function App() {
             <div className="panel-header">
               <div>
                 <h2>เป้าหมายออม</h2>
-                <p>เพิ่ม แก้ไข หรือลบเป้าหมายที่บันทึกใน SQLite</p>
+                <p>เพิ่ม แก้ไข หรือลบเป้าหมายที่บันทึกใน local browser storage</p>
               </div>
             </div>
-            {!isDesktopMode ? (
-              <div className="panel-empty">เปิดผ่าน Electron เพื่อแก้ไขเป้าหมายจริง</div>
-            ) : (
-              <>
-                <form className="editor-form" onSubmit={createGoal}>
-                  <h3>เพิ่มเป้าหมายใหม่</h3>
-                  {renderGoalForm(
-                    newGoalDraft,
-                    (field, value) => setNewGoalDraft((draft) => ({ ...draft, [field]: value })),
-                    "เพิ่มเป้าหมาย",
-                  )}
-                </form>
-                <div className="goal-list">
-                  {realGoals.length === 0 ? (
-                    <div className="panel-empty">ยังไม่มีเป้าหมาย เพิ่มเป้าหมายแรกเพื่อเริ่มติดตาม</div>
-                  ) : (
-                    realGoals.map((item) => {
-                      const draft = goalDrafts[item.id] || goalToDraft(item);
-                      const percent =
-                        item.target_amount > 0
-                          ? Math.min(100, Math.round((item.saved_amount / item.target_amount) * 100))
-                          : 0;
+            <form className="editor-form" onSubmit={createGoal}>
+              <h3>เพิ่มเป้าหมายใหม่</h3>
+              {renderGoalForm(
+                newGoalDraft,
+                (field, value) => setNewGoalDraft((draft) => ({ ...draft, [field]: value })),
+                "เพิ่มเป้าหมาย",
+              )}
+            </form>
+            <div className="goal-list">
+              {realGoals.length === 0 ? (
+                <div className="panel-empty">ยังไม่มีเป้าหมาย เพิ่มเป้าหมายแรกเพื่อเริ่มติดตาม</div>
+              ) : (
+                realGoals.map((item) => {
+                  const draft = goalDrafts[item.id] || goalToDraft(item);
+                  const percent =
+                    item.target_amount > 0
+                      ? Math.min(100, Math.round((item.saved_amount / item.target_amount) * 100))
+                      : 0;
 
-                      return (
-                        <form
-                          className="goal-editor-card"
-                          key={item.id}
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            saveGoal(item.id);
-                          }}
+                  return (
+                    <form
+                      className="goal-editor-card"
+                      key={item.id}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        saveGoal(item.id);
+                      }}
+                    >
+                      <div className="goal-progress-row">
+                        <div>
+                          <strong>{item.label}</strong>
+                          <span>
+                            {formatMoney((item.saved_amount || 0) / 100)} /{" "}
+                            {formatMoney((item.target_amount || 0) / 100)}
+                          </span>
+                        </div>
+                        <div className="budget-meter" aria-label={`${item.label} สำเร็จ ${percent}%`}>
+                          <span style={{ width: `${percent}%` }} />
+                        </div>
+                        <b>{percent}%</b>
+                      </div>
+                      {renderGoalForm(
+                        draft,
+                        (field, value) =>
+                          setGoalDrafts((drafts) => ({
+                            ...drafts,
+                            [item.id]: { ...draft, [field]: value },
+                          })),
+                        "บันทึกเป้าหมาย",
+                      )}
+                      <div className="editor-actions">
+                        <small>บันทึกเมื่อ {new Date(item.updated_at).toLocaleDateString("th-TH")}</small>
+                        <button
+                          className="danger-button"
+                          type="button"
+                          onClick={() => deleteGoal(item.id)}
                         >
-                          <div className="goal-progress-row">
-                            <div>
-                              <strong>{item.label}</strong>
-                              <span>
-                                {formatMoney((item.saved_amount || 0) / 100)} /{" "}
-                                {formatMoney((item.target_amount || 0) / 100)}
-                              </span>
-                            </div>
-                            <div className="budget-meter" aria-label={`${item.label} สำเร็จ ${percent}%`}>
-                              <span style={{ width: `${percent}%` }} />
-                            </div>
-                            <b>{percent}%</b>
-                          </div>
-                          {renderGoalForm(
-                            draft,
-                            (field, value) =>
-                              setGoalDrafts((drafts) => ({
-                                ...drafts,
-                                [item.id]: { ...draft, [field]: value },
-                              })),
-                            "บันทึกเป้าหมาย",
-                          )}
-                          <div className="editor-actions">
-                            <small>บันทึกเมื่อ {new Date(item.updated_at).toLocaleDateString("th-TH")}</small>
-                            <button
-                              className="danger-button"
-                              type="button"
-                              onClick={() => deleteGoal(item.id)}
-                            >
-                              ลบเป้าหมาย
-                            </button>
-                          </div>
-                        </form>
-                      );
-                    })
-                  )}
-                </div>
-              </>
-            )}
+                          ลบเป้าหมาย
+                        </button>
+                      </div>
+                    </form>
+                  );
+                })
+              )}
+            </div>
           </section>
         );
 
@@ -1005,7 +914,6 @@ export default function App() {
                       setProfileDraft((draft) => ({ ...draft, display_name: event.target.value }))
                     }
                     placeholder="ชื่อที่จะแสดงบนแถบด้านบน"
-                    disabled={!isDesktopMode}
                   />
                 </label>
                 <label className="field-stack">
@@ -1017,7 +925,6 @@ export default function App() {
                       setProfileDraft((draft) => ({ ...draft, avatar_initial: event.target.value }))
                     }
                     placeholder="เช่น IC"
-                    disabled={!isDesktopMode}
                   />
                 </label>
                 <label className="field-stack">
@@ -1028,10 +935,9 @@ export default function App() {
                       setProfileDraft((draft) => ({ ...draft, email: event.target.value }))
                     }
                     placeholder="เก็บในเครื่องเท่านั้น"
-                    disabled={!isDesktopMode}
                   />
                 </label>
-                <button className="add-button" type="submit" disabled={!isDesktopMode}>
+                <button className="add-button" type="submit">
                   บันทึกโปรไฟล์
                 </button>
               </div>
@@ -1039,11 +945,11 @@ export default function App() {
             <div className="settings-list">
               <article>
                 <span>โหมดการทำงาน</span>
-                <strong>{window.electronAPI ? "Electron desktop" : "Browser preview"}</strong>
+                <strong>Web app (local browser)</strong>
               </article>
               <article>
-                <span>ฐานข้อมูล</span>
-                <strong>{isDesktopMode ? "SQLite พร้อมใช้งาน" : "ต้องเปิดผ่าน Electron"}</strong>
+                <span>ที่เก็บข้อมูล</span>
+                <strong>IndexedDB / local browser storage</strong>
               </article>
               <article>
                 <span>จำนวนรายการจริง</span>

@@ -1,48 +1,80 @@
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 
-export default function CashflowChart({ rangeFactor = 1, transactions = [] }) {
+const PERIOD_OPTIONS = [
+  { id: "daily", label: "รายวัน", maxBars: 48 },
+  { id: "monthly", label: "รายเดือน", maxBars: 24 },
+  { id: "yearly", label: "รายปี", maxBars: 8 },
+];
+
+function formatMonthLabel(ym) {
+  // ym: YYYY-MM
+  const [y, m] = ym.split("-");
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString("th-TH", { month: "short", year: "numeric" });
+}
+
+function formatYearLabel(y) {
+  return String(y);
+}
+
+export default function CashflowChart({ rangeFactor = 1, transactions = [], defaultPeriod = "monthly" }) {
+  const [period, setPeriod] = useState(defaultPeriod);
   const hasRealData = transactions.length > 0;
+  const currentOpt = PERIOD_OPTIONS.find((p) => p.id === period) || PERIOD_OPTIONS[1];
+
   let chartData = [];
+  let viewLabel = currentOpt.label;
 
   if (hasRealData) {
-    // รวมรายรับ-รายจ่ายตามวัน (ใช้วันของเดือน)
-    const daily = {};
+    const groups = {};
 
-    transactions.forEach(tx => {
-      // ดึงวันจากวันที่ (รองรับทั้ง ISO และรูปแบบเก่า)
-      let day = "01";
+    transactions.forEach((tx) => {
+      let key = "1970-01-01";
       if (tx.date) {
-        const parts = tx.date.split(/[-/]/);
-        day = parts[2] ? parts[2].padStart(2, "0") : parts[0].padStart(2, "0");
+        const d = String(tx.date).slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+          if (period === "daily") {
+            key = d;
+          } else if (period === "monthly") {
+            key = d.slice(0, 7); // YYYY-MM
+          } else {
+            key = d.slice(0, 4); // YYYY
+          }
+        } else {
+          key = d || key;
+        }
       }
-
-      if (!daily[day]) {
-        daily[day] = { income: 0, expense: 0 };
+      if (!groups[key]) {
+        groups[key] = { income: 0, expense: 0, rawDate: key };
       }
-      daily[day].income += (tx.income || 0) / 100;   // แปลงจากสตางค์เป็นบาท
-      daily[day].expense += (tx.expense || 0) / 100;
+      groups[key].income += (tx.income || 0) / 100;
+      groups[key].expense += (tx.expense || 0) / 100;
     });
 
-    // สร้างข้อมูลสำหรับกราฟ (เรียงวัน)
-    const sortedDays = Object.keys(daily).sort((a, b) => parseInt(a) - parseInt(b));
+    // Sort keys chrono asc, take latest N
+    let sortedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+    sortedKeys = sortedKeys.slice(-currentOpt.maxBars);
 
-    chartData = sortedDays.map(day => {
-      const inc = Math.round(daily[day].income);
-      const exp = Math.round(daily[day].expense);
+    chartData = sortedKeys.map((key) => {
+      const inc = Math.round(groups[key].income);
+      const exp = Math.round(groups[key].expense);
       const net = inc - exp;
-
-      // ปรับสเกลให้กราฟสวย (max 100)
       const maxVal = Math.max(inc, exp, Math.abs(net), 1);
-      const scale = 95 / maxVal;
-
+      const scale = 94 / maxVal;
+      let label = key;
+      if (period === "monthly") label = formatMonthLabel(key);
+      else if (period === "yearly") label = formatYearLabel(key);
+      else label = key.slice(5); // MM-DD
       return {
-        day,
+        key,
+        label,
         income: Math.min(100, Math.max(4, Math.round(inc * scale))),
         expense: Math.min(100, Math.max(4, Math.round(exp * scale))),
-        net: Math.round(net * scale * 0.8),
+        net: Math.round(net * scale * 0.82),
+        incomeRaw: inc,
+        expenseRaw: exp,
       };
     });
-
   }
 
   return (
@@ -50,12 +82,22 @@ export default function CashflowChart({ rangeFactor = 1, transactions = [] }) {
       <div className="panel-header">
         <div>
           <h2>กระแสเงินสด</h2>
-          <p>{hasRealData ? "จากข้อมูลที่นำเข้า" : "ยังไม่มีธุรกรรมจริงสำหรับสร้างกราฟ"}</p>
+          <p>{hasRealData ? `มุมมอง${viewLabel} • จากข้อมูลที่นำเข้า` : "ยังไม่มีธุรกรรมจริงสำหรับสร้างกราฟ"}</p>
         </div>
-        <button className="small-control" type="button">
-          รายวัน
-          <ChevronDown size={14} />
-        </button>
+        <div className="segmented" role="tablist" aria-label="เลือกช่วงเวลา">
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              role="tab"
+              aria-selected={period === opt.id}
+              className={`seg-btn ${period === opt.id ? "active" : ""}`}
+              onClick={() => setPeriod(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="chart-legend" aria-hidden="true">
         <span className="legend-dot income" /> รายรับ
@@ -65,18 +107,18 @@ export default function CashflowChart({ rangeFactor = 1, transactions = [] }) {
       {chartData.length === 0 ? (
         <div className="panel-empty">นำเข้า statement หรือเพิ่มธุรกรรมจริงเพื่อดูกราฟกระแสเงินสด</div>
       ) : (
-        <div className="cash-chart" aria-label="กราฟกระแสเงินสด">
+        <div className="cash-chart" aria-label={`กราฟกระแสเงินสด ${viewLabel}`}>
           {chartData.map((item, index) => {
-            const netHeight = Math.max(12, Math.min(92, (item.net || 0) * 1.45 * Math.min(rangeFactor, 1.25)));
+            const netHeight = Math.max(10, Math.min(93, (item.net || 0) * 1.48 * Math.min(rangeFactor, 1.3)));
 
             return (
-              <div className="cash-day" key={`${item.day}-${index}`}>
-                <div className="net-point" style={{ bottom: `${netHeight}%` }} />
+              <div className="cash-day" key={`${item.key}-${index}`}>
+                <div className="net-point" style={{ bottom: `${netHeight}%` }} title={`สุทธิ ${item.incomeRaw - item.expenseRaw} บาท`} />
                 <div className="cash-bars">
-                  <span className="income-bar" style={{ height: `${item.income || 8}%` }} />
-                  <span className="expense-bar" style={{ height: `${item.expense || 8}%` }} />
+                  <span className="income-bar" style={{ height: `${item.income || 8}%` }} title={`รายรับ ${item.incomeRaw} บาท`} />
+                  <span className="expense-bar" style={{ height: `${item.expense || 8}%` }} title={`รายจ่าย ${item.expenseRaw} บาท`} />
                 </div>
-                <em>{item.day}</em>
+                <em>{item.label}</em>
               </div>
             );
           })}

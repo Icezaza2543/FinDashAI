@@ -35,8 +35,8 @@ export default function Sidebar({ activeNav, onChange }) {
       <div className="bank-status">
         <CheckCircle2 size={22} />
         <div>
-          <strong>ฐานข้อมูลบนเครื่อง</strong>
-          <span>Offline SQLite</span>
+          <strong>ข้อมูลบนเครื่อง</strong>
+          <span>IndexedDB / Local</span>
         </div>
       </div>
     </aside>

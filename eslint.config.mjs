@@ -7,19 +7,6 @@ import globals from "globals";
 export default [
   { ignores: ["dist", "node_modules", "eslint.config.mjs"] },
   {
-    files: ["electron/**/*.js"],
-    languageOptions: {
-      ecmaVersion: 2024,
-      globals: globals.node,
-      parserOptions: {
-        sourceType: "commonjs",
-      },
-    },
-    rules: {
-      ...js.configs.recommended.rules,
-    },
-  },
-  {
     files: ["src/**/*.{js,jsx}", "vite.config.js"],
     languageOptions: {
       ecmaVersion: 2024,

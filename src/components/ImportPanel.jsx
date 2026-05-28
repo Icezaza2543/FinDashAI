@@ -1,36 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FileSpreadsheet, Upload, CheckCircle, AlertCircle, X } from "lucide-react";
+import financeStore from "../lib/financeStore";
 
 export default function ImportPanel({ visible, onImported }) {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [selectedPath, setSelectedPath] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [accounts, setAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [importSuccess, setImportSuccess] = useState(null);
   const [error, setError] = useState("");
-  const isDesktopMode = Boolean(
-    window.electronAPI?.openFileDialog
-      && window.electronAPI?.previewStatement
-      && window.electronAPI?.importStatement
-  );
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (!visible) {
-      return;
-    }
+    if (!visible) return;
 
     let isMounted = true;
 
     const loadAccounts = async () => {
       try {
-        const electronAccounts = await window.electronAPI?.getAccounts?.();
-        const nextAccounts = electronAccounts || [];
-
+        const accs = await financeStore.getAccounts().catch(() => []);
         if (isMounted) {
-          setAccounts(nextAccounts);
-          setSelectedAccountId((current) => current || nextAccounts[0]?.id || "");
+          setAccounts(accs || []);
+          setSelectedAccountId((current) => current || (accs && accs[0]?.id) || "");
         }
       } catch {
         if (isMounted) {
@@ -42,39 +35,36 @@ export default function ImportPanel({ visible, onImported }) {
 
     loadAccounts();
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [visible]);
 
-  if (!visible) {
-    return null;
-  }
+  if (!visible) return null;
 
-  const handleFileSelect = async () => {
+  const triggerFilePicker = () => {
     setError("");
     setResult(null);
     setImportSuccess(null);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    // reset input so same file can be re-chosen
+    event.target.value = "";
+
+    if (!file) return;
+
+    setError("");
+    setResult(null);
+    setImportSuccess(null);
+    setSelectedFile(file);
+    setSelectedFileName(file.name);
+
+    setIsLoading(true);
 
     try {
-      if (!isDesktopMode) {
-        setError("การนำเข้าไฟล์และฐานข้อมูล SQLite ใช้ได้เฉพาะเมื่อเปิดผ่าน Electron desktop app หรือไฟล์ .exe");
-        return;
-      }
-
-      const selected = await window.electronAPI?.openFileDialog();
-
-      if (!selected) return;
-
-      setIsLoading(true);
-
-      const parseResult = await window.electronAPI.previewStatement(selected);
-
-      const fileName = selected.split(/[\\/]/).pop() || selected;
-
+      const parseResult = await financeStore.previewImport(file, selectedAccountId || accounts[0]?.id);
       if (parseResult?.success) {
-        setSelectedPath(selected);
-        setSelectedFileName(fileName);
         setResult({
           transactions: parseResult.transactions || [],
           count: parseResult.count ?? parseResult.transactions?.length ?? 0,
@@ -83,17 +73,20 @@ export default function ImportPanel({ visible, onImported }) {
         });
       } else {
         setError(parseResult?.error || "ไม่สามารถอ่านไฟล์ได้");
+        setSelectedFile(null);
+        setSelectedFileName("");
       }
     } catch (e) {
-      const msg = e?.message || String(e);
-      setError("เกิดข้อผิดพลาด: " + msg);
+      setError("เกิดข้อผิดพลาด: " + (e?.message || String(e)));
+      setSelectedFile(null);
+      setSelectedFileName("");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleImport = async () => {
-    if (!result || !selectedPath || !selectedAccountId) {
+    if (!selectedFile || !selectedAccountId) {
       setError("กรุณาเลือกไฟล์และบัญชีปลายทางก่อนนำเข้า หากยังไม่มีบัญชีให้เพิ่มในเมนูบัญชีและกระเป๋า");
       return;
     }
@@ -103,20 +96,13 @@ export default function ImportPanel({ visible, onImported }) {
     setImportSuccess(null);
 
     try {
-      if (!isDesktopMode) {
-        throw new Error("โหมดนี้ต้องรันผ่าน Electron เพื่อบันทึกข้อมูลจริง");
-      }
-
-      const importResult = await window.electronAPI.importStatement({
-        filePath: selectedPath,
-        accountId: selectedAccountId,
-      });
+      const importResult = await financeStore.importFromFile(selectedFile, selectedAccountId);
 
       if (!importResult?.success) {
-        throw new Error(importResult?.error || "ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้");
+        throw new Error(importResult?.error || "ไม่สามารถบันทึกข้อมูลลง local storage ได้");
       }
 
-      const selectedAcc = accounts.find(a => a.id === selectedAccountId);
+      const selectedAcc = accounts.find((a) => a.id === selectedAccountId);
 
       setImportSuccess({
         imported: importResult.imported || 0,
@@ -125,7 +111,7 @@ export default function ImportPanel({ visible, onImported }) {
       });
 
       setResult(null);
-      setSelectedPath("");
+      setSelectedFile(null);
       setSelectedFileName("");
       onImported?.();
     } catch (e) {
@@ -137,43 +123,42 @@ export default function ImportPanel({ visible, onImported }) {
 
   const handleCloseResult = () => {
     setResult(null);
-    setSelectedPath("");
+    setSelectedFile(null);
     setSelectedFileName("");
     setImportSuccess(null);
     setError("");
   };
 
-  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
 
   return (
     <section className="import-panel">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+
       <div className="import-copy">
         <Upload size={21} />
         <div>
           <strong>นำเข้าข้อมูลจริงจาก Statement</strong>
           <span>
-            {isDesktopMode
-              ? "รองรับ CSV และ Excel .xlsx จากธนาคารไทย — ทำงานแบบ Offline 100% (ไม่มีข้อมูลส่งออกนอกเครื่อง)"
-              : "โหมด Browser preview แสดง Dashboard ได้ แต่การนำเข้าไฟล์ต้องเปิดผ่าน Electron desktop app"}
+            รองรับ CSV และ Excel .xlsx จากธนาคารไทย — ทำงานแบบ Offline 100% (เก็บใน IndexedDB ของเบราว์เซอร์)
           </span>
         </div>
       </div>
 
       <div className="import-actions">
-        <button type="button" onClick={handleFileSelect} disabled={isLoading || !isDesktopMode || accounts.length === 0}>
+        <button type="button" onClick={triggerFilePicker} disabled={isLoading || accounts.length === 0}>
           <FileSpreadsheet size={17} />
-          {isLoading ? "กำลังอ่านไฟล์..." : isDesktopMode ? "เลือกไฟล์ CSV / XLSX" : "เปิดผ่าน Electron เพื่อเลือกไฟล์"}
+          {isLoading ? "กำลังอ่านไฟล์..." : "เลือกไฟล์ CSV / XLSX"}
         </button>
       </div>
 
-      {!isDesktopMode && (
-        <div className="import-warning">
-          <AlertCircle size={16} />
-          เปิดด้วย `npm run electron:dev` หรือไฟล์ `.exe` เพื่อใช้ import, SQLite และระบบ offline จริง
-        </div>
-      )}
-
-      {isDesktopMode && accounts.length === 0 && (
+      {accounts.length === 0 && (
         <div className="import-warning">
           <AlertCircle size={16} />
           เพิ่มบัญชีธนาคารหรือบัญชีเงินสดก่อน จึงจะนำเข้า statement ได้
@@ -184,12 +169,12 @@ export default function ImportPanel({ visible, onImported }) {
       {accounts.length > 0 && (
         <div className="import-account-select">
           <label>นำเข้าลงบัญชี:</label>
-          <select 
-            value={selectedAccountId} 
+          <select
+            value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
             disabled={isLoading || !!result}
           >
-            {accounts.map(acc => (
+            {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
                 {acc.institution ? `${acc.name} · ${acc.institution}` : acc.name} (คงเหลือ ฿{(acc.current_balance / 100).toLocaleString("th-TH")})
               </option>
@@ -255,16 +240,16 @@ export default function ImportPanel({ visible, onImported }) {
             </div>
           )}
 
-          <button 
-            className="import-confirm-btn" 
+          <button
+            className="import-confirm-btn"
             onClick={handleImport}
             disabled={isLoading || !selectedAccountId}
           >
-            {isLoading ? "กำลังนำเข้าข้อมูล..." : "นำเข้าข้อมูลลงฐานข้อมูล (บันทึกถาวร)"}
+            {isLoading ? "กำลังนำเข้าข้อมูล..." : "นำเข้าข้อมูลลง local storage (บันทึกถาวร)"}
           </button>
 
           <div className="import-note">
-            ระบบจะใช้กฎจัดหมวดหมู่ที่คุณตั้งไว้ (เช่น BIG C → อาหาร) และป้องกันการนำเข้าซ้ำโดยอัตโนมัติ
+            ระบบจะใช้กฎจัดหมวดหมู่ที่คุณตั้งไว้ (เช่น BIG C → อาหาร) และป้องกันการนำเข้าซ้ำโดยอัตโนมัติ (รวมกรณีรายการซ้ำใน statement เดียวกัน)
           </div>
         </div>
       )}

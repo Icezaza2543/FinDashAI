@@ -1,9 +1,9 @@
 {
   "name": "findash-ai",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "main": "electron/main.js",
-  "description": "FinDash AI - Personal Finance Dashboard (Desktop)",
+  "description": "FinDash AI - Personal Finance Dashboard (Web App, local-first)",
+  "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -12,14 +12,10 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{js,jsx,css,json,md}\"",
-    "smoke:production": "node scripts/run-electron-node.cjs scripts/smoke-production.cjs",
-    "electron:dev": "concurrently -k -n vite,electron -c green,cyan \"npm run dev\" \"wait-on tcp:127.0.0.1:5173 && node scripts/start-electron.cjs\"",
-    "electron:build": "npm run build && electron-builder",
-    "build:exe": "npm run electron:build"
+    "format": "prettier --write \"src/**/*.{js,jsx,css,json,md}\""
   },
   "dependencies": {
-    "iconv-lite": "^0.7.2",
+    "@fontsource/noto-sans-thai-looped": "^5.2.10",
     "lucide-react": "^1.16.0",
     "papaparse": "^5.5.3",
     "react": "^19.1.0",
@@ -29,9 +25,6 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@vitejs/plugin-react": "^6.0.0",
-    "concurrently": "^9.2.1",
-    "electron": "^42.3.0",
-    "electron-builder": "^26.8.1",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-react": "^7.37.5",
@@ -39,29 +32,6 @@
     "eslint-plugin-react-refresh": "^0.4.26",
     "globals": "^15.15.0",
     "prettier": "^3.8.3",
-    "vite": "^8.0.0",
-    "wait-on": "^9.0.10"
-  },
-  "build": {
-    "appId": "ai.findash.desktop",
-    "productName": "FinDash AI",
-    "directories": {
-      "output": "dist-electron"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*"
-    ],
-    "win": {
-      "target": [
-        "nsis"
-      ],
-      "icon": "public/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
-    }
+    "vite": "^8.0.0"
   }
 }

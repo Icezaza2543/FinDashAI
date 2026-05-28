@@ -26,7 +26,7 @@ export default function ProfitabilityPanel({ accountCount = 0, metrics, transact
     {
       label: "บัญชี",
       value: `${accountCount.toLocaleString("th-TH")} บัญชี`,
-      detail: "บันทึกใน SQLite",
+      detail: "IndexedDB / local storage",
     },
   ];
 

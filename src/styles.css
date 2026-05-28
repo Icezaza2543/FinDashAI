@@ -23,7 +23,7 @@
   --violet: #7c4dba;
   --shadow: 0 16px 48px rgba(15, 38, 54, 0.08);
   --small-shadow: 0 10px 24px rgba(15, 38, 54, 0.06);
-  font-family: "Noto Sans Thai", Inter, "Segoe UI", Tahoma, Arial, sans-serif;
+  font-family: "Noto Sans Thai Looped", "Noto Sans Thai", Inter, "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 * {
@@ -1692,7 +1692,7 @@ th:nth-last-child(-n + 3) {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 820px) {
   .app-topbar {
     position: static;
     align-items: stretch;
