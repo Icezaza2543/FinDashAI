@@ -12,22 +12,14 @@ import BudgetPanel from "./components/BudgetPanel";
 import TransactionTable from "./components/TransactionTable";
 import InsightPanel from "./components/InsightPanel";
 import ProfitabilityPanel from "./components/ProfitabilityPanel";
+import CategoryManager from "./components/CategoryManager";
+import ReportsAnalytics from "./components/ReportsAnalytics";
 
 import { ranges, navItems } from "./data/filters";
 import { formatMoney } from "./utils/formatters";
 import financeStore from "./lib/financeStore";
 
-const CATEGORY_LABEL_MAP = {
-  "cat-income": "รายได้ประจำ",
-  "cat-food": "อาหารและเครื่องดื่ม",
-  "cat-housing": "ที่อยู่อาศัย",
-  "cat-transport": "การเดินทาง",
-  "cat-utility": "สาธารณูปโภค",
-  "cat-shopping": "ช้อปปิ้ง",
-  "cat-health": "สุขภาพ",
-  "cat-entertainment": "ความบันเทิง",
-  "cat-other": "อื่น ๆ",
-};
+const CATEGORY_LABEL_MAP = {}; // dynamic from store now; keep for ultra-legacy fallback only
 
 const EMPTY_PROFILE = {
   display_name: "",
@@ -65,16 +57,7 @@ const ACCOUNT_TYPE_LABELS = {
   cash: "เงินสด",
 };
 
-const BUDGET_CATEGORY_OPTIONS = [
-  { id: "cat-food", label: "อาหารและเครื่องดื่ม" },
-  { id: "cat-housing", label: "ที่อยู่อาศัย" },
-  { id: "cat-transport", label: "การเดินทาง" },
-  { id: "cat-utility", label: "สาธารณูปโภค" },
-  { id: "cat-shopping", label: "ช้อปปิ้ง" },
-  { id: "cat-health", label: "สุขภาพ" },
-  { id: "cat-entertainment", label: "ความบันเทิง" },
-  { id: "cat-other", label: "อื่น ๆ" },
-];
+// BUDGET_CATEGORY_OPTIONS removed - now dynamic from realCategories in renderBudgetForm
 
 function bahtToSatang(value) {
   const amount = Number(String(value || "0").replace(/,/g, ""));
@@ -125,6 +108,8 @@ export default function App() {
   const [realBudgets, setRealBudgets] = useState([]);
   const [realGoals, setRealGoals] = useState([]);
   const [allTransactions, setAllTransactions] = useState([]);
+  const [realCategories, setRealCategories] = useState([]);
+  const [realRules, setRealRules] = useState([]);
   const [userProfile, setUserProfile] = useState(EMPTY_PROFILE);
   const [profileDraft, setProfileDraft] = useState(EMPTY_PROFILE);
   const [newAccountDraft, setNewAccountDraft] = useState(EMPTY_ACCOUNT_DRAFT);
@@ -139,12 +124,14 @@ export default function App() {
 
     const loadRealData = async () => {
       try {
-        const [accs, budgets, goals, txs, profile] = await Promise.all([
+        const [accs, budgets, goals, txs, profile, cats, rules] = await Promise.all([
           financeStore.getAccounts().catch(() => []),
           financeStore.getBudgets ? financeStore.getBudgets().catch(() => []) : Promise.resolve([]),
           financeStore.getGoals ? financeStore.getGoals().catch(() => []) : Promise.resolve([]),
           financeStore.getTransactions().catch(() => []),
           financeStore.getUserProfile ? financeStore.getUserProfile().catch(() => EMPTY_PROFILE) : Promise.resolve(EMPTY_PROFILE),
+          financeStore.getCategories ? financeStore.getCategories().catch(() => []) : Promise.resolve([]),
+          financeStore.getCategoryRules ? financeStore.getCategoryRules().catch(() => []) : Promise.resolve([]),
         ]);
 
         if (isMounted) {
@@ -153,6 +140,8 @@ export default function App() {
           setRealGoals(goals || []);
           setAllTransactions(txs || []);
           setUserProfile({ ...EMPTY_PROFILE, ...(profile || {}) });
+          setRealCategories(cats || []);
+          setRealRules(rules || []);
         }
       } catch (error) {
         console.warn("โหลดข้อมูลจาก local storage ไม่ได้", error);
@@ -162,6 +151,8 @@ export default function App() {
           setRealGoals([]);
           setAllTransactions([]);
           setUserProfile(EMPTY_PROFILE);
+          setRealCategories([]);
+          setRealRules([]);
         }
       }
     };
@@ -229,11 +220,31 @@ export default function App() {
 
   const activeRange = ranges.find((item) => item.id === range) ?? ranges[0];
   const activeNavLabel = navItems.find((item) => item.id === activeNav)?.label ?? "ภาพรวมการเงิน";
+  const transactionCategoryOptions = useMemo(
+    () => [
+      { id: "all", label: "ทุกหมวดหมู่" },
+      ...(realCategories.length > 0
+        ? realCategories.map((item) => ({ id: item.id, label: item.label }))
+        : [
+            { id: "cat-income", label: "รายได้ประจำ" },
+            { id: "cat-food", label: "อาหารและเครื่องดื่ม" },
+            { id: "cat-housing", label: "ที่อยู่อาศัย" },
+            { id: "cat-transport", label: "การเดินทาง" },
+            { id: "cat-utility", label: "สาธารณูปโภค" },
+            { id: "cat-shopping", label: "ช้อปปิ้ง" },
+            { id: "cat-health", label: "สุขภาพ" },
+            { id: "cat-entertainment", label: "ความบันเทิง" },
+            { id: "cat-other", label: "อื่น ๆ" },
+          ]),
+    ],
+    [realCategories],
+  );
 
   const normalizedTransactions = useMemo(() => {
+    const catMap = new Map(realCategories.map((c) => [c.id, c.label]));
     return allTransactions.map((transaction) => {
       const categoryLabel =
-        transaction.category_label || CATEGORY_LABEL_MAP[transaction.category_id] || "อื่น ๆ";
+        transaction.category_label || catMap.get(transaction.category_id) || CATEGORY_LABEL_MAP[transaction.category_id] || "อื่น ๆ";
       const accountInfo = accountById.get(transaction.account_id);
 
       return {
@@ -251,7 +262,7 @@ export default function App() {
         balance: 0,
       };
     });
-  }, [accountById, allTransactions]);
+  }, [accountById, allTransactions, realCategories]);
 
   const filteredTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -259,7 +270,7 @@ export default function App() {
     return normalizedTransactions.filter((row) => {
       const accountMatch = account === "all" || row.account === account;
       const sourceMatch = source === "all" || row.source === source;
-      const categoryMatch = category === "all" || row.category === category;
+      const categoryMatch = category === "all" || row.categoryId === category || row.category === category;
       const searchMatch =
         !query ||
         [row.title, row.categoryLabel, row.accountLabel, row.account, row.source].some((value) =>
@@ -276,7 +287,7 @@ export default function App() {
     const filtered = normalizedTransactions.filter((row) => {
       const accountMatch = account === "all" || row.account === account;
       const sourceMatch = source === "all" || row.source === source;
-      const categoryMatch = category === "all" || row.category === category;
+      const categoryMatch = category === "all" || row.categoryId === category || row.category === category;
       return accountMatch && sourceMatch && categoryMatch;
     });
 
@@ -566,7 +577,16 @@ export default function App() {
           onChange={(event) => onChange("category_id", event.target.value)}
           disabled={disabled}
         >
-          {BUDGET_CATEGORY_OPTIONS.map((option) => (
+          {(realCategories.length > 0 ? realCategories.filter((c) => c.id !== "cat-income") : [
+            { id: "cat-food", label: "อาหารและเครื่องดื่ม" },
+            { id: "cat-housing", label: "ที่อยู่อาศัย" },
+            { id: "cat-transport", label: "การเดินทาง" },
+            { id: "cat-utility", label: "สาธารณูปโภค" },
+            { id: "cat-shopping", label: "ช้อปปิ้ง" },
+            { id: "cat-health", label: "สุขภาพ" },
+            { id: "cat-entertainment", label: "ความบันเทิง" },
+            { id: "cat-other", label: "อื่น ๆ" },
+          ]).map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
             </option>
@@ -704,6 +724,19 @@ export default function App() {
           <>
             {filterControls}
             {importPanel}
+            <section className="panel">
+              <div className="panel-header compact">
+                <div>
+                  <h2>จัดการหมวดหมู่และกฎ</h2>
+                  <p>เพิ่ม/แก้ไข/ลบหมวดหมู่และกฎจับคู่ข้อความ (มีผลกับการนำเข้าถัดไปและสามารถปรับย้อนหลัง)</p>
+                </div>
+              </div>
+              <CategoryManager
+                categories={realCategories}
+                rules={realRules}
+                onChanged={() => setRefreshCount((c) => c + 1)}
+              />
+            </section>
             <TransactionTable
               category={category}
               rows={filteredTransactions}
@@ -711,6 +744,16 @@ export default function App() {
               onAddTransaction={handleAddTransaction}
               onCategoryChange={setCategory}
               onSearchChange={setSearch}
+              categories={realCategories}
+              filterCategories={transactionCategoryOptions}
+              onTransactionCategoryChange={async (txId, newCatId) => {
+                try {
+                  await financeStore.updateTransactionCategory(txId, newCatId);
+                  setRefreshCount((c) => c + 1);
+                } catch (e) {
+                  alert(e?.message || "เปลี่ยนหมวดไม่สำเร็จ");
+                }
+              }}
             />
           </>
         );
@@ -871,7 +914,7 @@ export default function App() {
           <>
             {filterControls}
             <div className="view-grid reports-grid">
-              <CashflowChart rangeFactor={activeRange.factor} transactions={analyticTransactions} />
+              <CashflowChart defaultPeriod="monthly" rangeFactor={activeRange.factor} transactions={analyticTransactions} />
               <ExpenseDonut transactions={analyticTransactions} />
               <ProfitabilityPanel
                 accountCount={realAccounts.length}
@@ -879,6 +922,7 @@ export default function App() {
                 transactions={analyticTransactions}
               />
             </div>
+            <ReportsAnalytics transactions={analyticTransactions} accounts={realAccounts} />
           </>
         );
 

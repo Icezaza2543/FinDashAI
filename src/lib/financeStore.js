@@ -884,7 +884,7 @@ async function deleteCategory(id) {
     if (useLS || data) return (data.transactions || []).filter((t) => t.category_id === id).length;
     if (!store) return 0;
     return new Promise((res) => {
-      const idx = store.index('account_id'); // no cat index, full scan ok (small data)
+      // full scan (no category index) is acceptable for local dataset size
       const req = store.getAll();
       req.onsuccess = () => res((req.result || []).filter((t) => t.category_id === id).length);
       req.onerror = () => res(0);

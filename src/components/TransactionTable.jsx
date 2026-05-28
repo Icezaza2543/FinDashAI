@@ -1,5 +1,5 @@
 import { CreditCard, Search, TrendingUp, Upload } from "lucide-react";
-import { categories } from "../data/filters";
+import { categories as fallbackCategories } from "../data/filters";
 import { formatMoney } from "../utils/formatters";
 import SelectControl from "./SelectControl";
 
@@ -25,7 +25,14 @@ export default function TransactionTable({
   onSearchChange,
   onCategoryChange,
   onAddTransaction,
+  categories = [],
+  filterCategories,
+  onTransactionCategoryChange,
 }) {
+  const catOptions = (categories && categories.length > 0)
+    ? categories.map((c) => ({ id: c.id, label: c.label }))
+    : fallbackCategories.filter((c) => c.id !== "all");
+  const filterOptions = filterCategories?.length ? filterCategories : fallbackCategories;
   return (
     <section className="panel transaction-panel">
       <div className="table-toolbar">
@@ -46,7 +53,7 @@ export default function TransactionTable({
           <SelectControl
             label="หมวดหมู่"
             value={category}
-            options={categories}
+            options={filterOptions}
             onChange={onCategoryChange}
           />
           <button className="add-button" type="button" onClick={onAddTransaction}>
@@ -80,7 +87,22 @@ export default function TransactionTable({
                     <strong>{row.title}</strong>
                   </div>
                 </td>
-                <td>{row.categoryLabel}</td>
+                <td>
+                  {onTransactionCategoryChange ? (
+                    <select
+                      className="cat-select-inline"
+                      value={row.categoryId || "cat-other"}
+                      onChange={(e) => onTransactionCategoryChange(row.id, e.target.value)}
+                      title="เปลี่ยนหมวดหมู่สำหรับรายการนี้"
+                    >
+                      {catOptions.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    row.categoryLabel
+                  )}
+                </td>
                 <td>{row.accountLabel || row.account}</td>
                 <td className="money-in">{row.income ? formatMoney(row.income / 100) : "-"}</td>
                 <td className="money-out">{row.expense ? formatMoney(row.expense / 100) : "-"}</td>

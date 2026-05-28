@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/Platform-Browser-0078D6?style=flat&logo=googlechrome&logoColor=white" alt="Browser">
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=white" alt="React">
   <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat&logo=vite&logoColor=white" alt="Vite">
-  <img src="https://img.shields.io/badge/Version-0.4.0-3b82f6?style=flat" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.5.0-3b82f6?style=flat" alt="Version">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License: MIT"></a>
 </p>
 
@@ -42,8 +42,11 @@
 **📈 Dashboard เรียลไทม์**  
 กราฟกระแสเงินสด โดนัทค่าใช้จ่าย และข้อมูลเชิงลึก (แก้ group ตามวันที่จริง)
 
-**🧠 Categorization อัจฉริยะ**  
-หมวดหมู่อัตโนมัติ + สามารถกำหนดกฎเองได้
+**🧠 Categorization อัจฉริยะ + กำหนดเอง**
+หมวดหมู่อัตโนมัติด้วย regex rules (ค่าเริ่มต้น) + เพิ่ม/แก้/ลบหมวดหมู่และกฎ custom ได้เต็มรูปแบบในหน้า Transactions (บันทึกใน IndexedDB)
+
+**📊 รายงานขั้นสูง**
+กราฟกระแสเงินสด (รายวัน/เดือน/ปี), แนวโน้ม SVG, สัดส่วนหมวด, Top expenses, Account flow, Recurring insights — ใช้ native charts ไม่พึ่ง lib หนัก
 
 **📤 Export ข้อมูล**  
 ส่งออกธุรกรรมเป็น CSV ดาวน์โหลดได้ทันที
@@ -51,6 +54,12 @@
 </td>
 </tr>
 </table>
+
+### ✨ ฟีเจอร์ใหม่ v0.5.0
+- **Cashflow Chart**: เปลี่ยนมุมมองได้ทันที (รายวัน / รายเดือน / รายปี) ด้วยการจัดกลุ่มวันที่จริงแม่นยำ
+- **Transactions page**: Category Manager แบบเต็ม — เพิ่ม/ลบหมวดหมู่ custom, สร้างกฎจับคู่ข้อความ (pattern contains/regex), เปลี่ยนหมวดรายการธุรกรรมทีละรายการได้
+- **Reports**: เพิ่ม Reports Analytics ด้วย native SVG trend, bar charts, top expenses, account flow, recurring pattern insights (dense & professional)
+- **Typography**: ใช้ Noto Sans Thai Looped แบบ bundled (@fontsource) สำหรับความสวยงามและ offline-first จริง
 
 ---
 
