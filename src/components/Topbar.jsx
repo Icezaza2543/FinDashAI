@@ -11,7 +11,6 @@ export default function Topbar({
   return (
     <header className="app-topbar">
       <div className="title-block">
-        <span>{activeNavLabel}</span>
         <h1>{activeNavLabel}</h1>
       </div>
       <div className="topbar-actions">
