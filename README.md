@@ -60,6 +60,7 @@
 - **Transactions page**: Category Manager แบบเต็ม — เพิ่ม/ลบหมวดหมู่ custom, สร้างกฎจับคู่ข้อความ (pattern contains/regex), เปลี่ยนหมวดรายการธุรกรรมทีละรายการได้
 - **Reports**: เพิ่ม Reports Analytics ด้วย native SVG trend, bar charts, top expenses, account flow, recurring pattern insights (dense & professional)
 - **Typography**: ใช้ Noto Sans Thai Looped แบบ bundled (@fontsource) สำหรับความสวยงามและ offline-first จริง
+- **UI / UX Polish**: ปรับปรุงส่วน Topbar ให้เรียบง่าย ลดความซ้ำซ้อนของหัวข้อ และเพิ่มปุ่ม Import/Export ด่วน
 
 ---
 
