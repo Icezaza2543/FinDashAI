@@ -21,12 +21,6 @@ import financeStore from "./lib/financeStore";
 
 const CATEGORY_LABEL_MAP = {}; // dynamic from store now; keep for ultra-legacy fallback only
 
-const EMPTY_PROFILE = {
-  display_name: "",
-  avatar_initial: "",
-  email: "",
-};
-
 const EMPTY_ACCOUNT_DRAFT = {
   name: "",
   institution: "",
@@ -103,6 +97,7 @@ export default function App() {
   const [refreshCount, setRefreshCount] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [exportNote, setExportNote] = useState("");
+  const [isGlobalLoading, setIsGlobalLoading] = useState(true);
 
   const [realAccounts, setRealAccounts] = useState([]);
   const [realBudgets, setRealBudgets] = useState([]);
@@ -110,8 +105,6 @@ export default function App() {
   const [allTransactions, setAllTransactions] = useState([]);
   const [realCategories, setRealCategories] = useState([]);
   const [realRules, setRealRules] = useState([]);
-  const [userProfile, setUserProfile] = useState(EMPTY_PROFILE);
-  const [profileDraft, setProfileDraft] = useState(EMPTY_PROFILE);
   const [newAccountDraft, setNewAccountDraft] = useState(EMPTY_ACCOUNT_DRAFT);
   const [newBudgetDraft, setNewBudgetDraft] = useState(EMPTY_BUDGET_DRAFT);
   const [newGoalDraft, setNewGoalDraft] = useState(EMPTY_GOAL_DRAFT);
@@ -124,12 +117,11 @@ export default function App() {
 
     const loadRealData = async () => {
       try {
-        const [accs, budgets, goals, txs, profile, cats, rules] = await Promise.all([
+        const [accs, budgets, goals, txs, cats, rules] = await Promise.all([
           financeStore.getAccounts().catch(() => []),
           financeStore.getBudgets ? financeStore.getBudgets().catch(() => []) : Promise.resolve([]),
           financeStore.getGoals ? financeStore.getGoals().catch(() => []) : Promise.resolve([]),
           financeStore.getTransactions().catch(() => []),
-          financeStore.getUserProfile ? financeStore.getUserProfile().catch(() => EMPTY_PROFILE) : Promise.resolve(EMPTY_PROFILE),
           financeStore.getCategories ? financeStore.getCategories().catch(() => []) : Promise.resolve([]),
           financeStore.getCategoryRules ? financeStore.getCategoryRules().catch(() => []) : Promise.resolve([]),
         ]);
@@ -139,9 +131,9 @@ export default function App() {
           setRealBudgets(budgets || []);
           setRealGoals(goals || []);
           setAllTransactions(txs || []);
-          setUserProfile({ ...EMPTY_PROFILE, ...(profile || {}) });
           setRealCategories(cats || []);
           setRealRules(rules || []);
+          setIsGlobalLoading(false);
         }
       } catch (error) {
         console.warn("โหลดข้อมูลจาก local storage ไม่ได้", error);
@@ -150,9 +142,9 @@ export default function App() {
           setRealBudgets([]);
           setRealGoals([]);
           setAllTransactions([]);
-          setUserProfile(EMPTY_PROFILE);
           setRealCategories([]);
           setRealRules([]);
+          setIsGlobalLoading(false);
         }
       }
     };
@@ -163,14 +155,6 @@ export default function App() {
       isMounted = false;
     };
   }, [refreshCount]);
-
-  useEffect(() => {
-    setProfileDraft({
-      display_name: userProfile.display_name || "",
-      avatar_initial: userProfile.avatar_initial || "",
-      email: userProfile.email || "",
-    });
-  }, [userProfile]);
 
   useEffect(() => {
     const nextDrafts = {};
@@ -364,17 +348,16 @@ export default function App() {
 
   const refreshData = () => setRefreshCount((count) => count + 1);
 
-  const saveProfile = async (event) => {
-    event.preventDefault();
-
-    try {
-      const saved = await financeStore.updateUserProfile(profileDraft);
-      setUserProfile({ ...EMPTY_PROFILE, ...(saved || {}) });
-      showNote("บันทึกโปรไฟล์แล้ว");
-    } catch (error) {
-      showNote(error?.message || "บันทึกโปรไฟล์ไม่สำเร็จ");
+  async function handleWipeData() {
+    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลทั้งหมด? การดำเนินการนี้ไม่สามารถเรียกคืนได้")) {
+      try {
+        await financeStore.wipeAllData();
+        window.location.reload();
+      } catch (error) {
+        alert("เกิดข้อผิดพลาดในการลบข้อมูล: " + error.message);
+      }
     }
-  };
+  }
 
   const createAccount = async (event) => {
     event.preventDefault();
@@ -532,11 +515,39 @@ export default function App() {
       <label className="field-stack">
         <span>ธนาคาร/สถาบัน</span>
         <input
+          list="thai-banks"
           value={draft.institution}
           onChange={(event) => onChange("institution", event.target.value)}
-          placeholder="เช่น KBank, SCB, เงินสด"
+          placeholder="ค้นหาหรือพิมพ์ชื่อสถาบัน..."
           disabled={disabled}
+          autoComplete="off"
         />
+        <datalist id="thai-banks">
+          <option value="KBank (กสิกรไทย)" />
+          <option value="SCB (ไทยพาณิชย์)" />
+          <option value="BBL (กรุงเทพ)" />
+          <option value="KTB (กรุงไทย)" />
+          <option value="Krungsri (กรุงศรีอยุธยา)" />
+          <option value="TTB (ทหารไทยธนชาต)" />
+          <option value="UOB (ยูโอบี)" />
+          <option value="CIMB (ซีไอเอ็มบี ไทย)" />
+          <option value="GSB (ออมสิน)" />
+          <option value="GHB (ธอส.)" />
+          <option value="BAAC (ธ.ก.ส.)" />
+          <option value="TISCO (ทิสโก้)" />
+          <option value="KKP (เกียรตินาคินภัทร)" />
+          <option value="LHBANK (แลนด์ แอนด์ เฮ้าส์)" />
+          <option value="ICBC (ไอซีบีซี ไทย)" />
+          <option value="Standard Chartered" />
+          <option value="Citibank" />
+          <option value="TrueMoney Wallet" />
+          <option value="ShopeePay" />
+          <option value="Rabbit LINE Pay" />
+          <option value="Kept by krungsri" />
+          <option value="Make by KBank" />
+          <option value="Dime!" />
+          <option value="เงินสด (Cash)" />
+        </datalist>
       </label>
       <label className="field-stack">
         <span>ประเภท</span>
@@ -943,49 +954,10 @@ export default function App() {
           <section className="panel settings-panel">
             <div className="panel-header">
               <div>
-                <h2>ตั้งค่า</h2>
-                <p>โปรไฟล์ผู้ใช้และสถานะระบบ local-first</p>
+                <h2>ตั้งค่าและจัดการข้อมูล</h2>
+                <p>สถานะระบบและการลบข้อมูล</p>
               </div>
             </div>
-            <form className="editor-form" onSubmit={saveProfile}>
-              <h3>โปรไฟล์ผู้ใช้</h3>
-              <div className="editor-grid profile-grid">
-                <label className="field-stack">
-                  <span>ชื่อผู้ใช้</span>
-                  <input
-                    value={profileDraft.display_name}
-                    onChange={(event) =>
-                      setProfileDraft((draft) => ({ ...draft, display_name: event.target.value }))
-                    }
-                    placeholder="ชื่อที่จะแสดงบนแถบด้านบน"
-                  />
-                </label>
-                <label className="field-stack">
-                  <span>ตัวย่อโปรไฟล์</span>
-                  <input
-                    maxLength={2}
-                    value={profileDraft.avatar_initial}
-                    onChange={(event) =>
-                      setProfileDraft((draft) => ({ ...draft, avatar_initial: event.target.value }))
-                    }
-                    placeholder="เช่น IC"
-                  />
-                </label>
-                <label className="field-stack">
-                  <span>อีเมล/หมายเหตุ</span>
-                  <input
-                    value={profileDraft.email}
-                    onChange={(event) =>
-                      setProfileDraft((draft) => ({ ...draft, email: event.target.value }))
-                    }
-                    placeholder="เก็บในเครื่องเท่านั้น"
-                  />
-                </label>
-                <button className="add-button" type="submit">
-                  บันทึกโปรไฟล์
-                </button>
-              </div>
-            </form>
             <div className="settings-list">
               <article>
                 <span>โหมดการทำงาน</span>
@@ -1000,6 +972,20 @@ export default function App() {
                 <strong>{normalizedTransactions.length.toLocaleString("th-TH")} รายการ</strong>
               </article>
             </div>
+            <div className="editor-form" style={{ borderTop: "1px solid var(--line)", marginTop: "20px" }}>
+              <h3>จัดการข้อมูล</h3>
+              <p style={{ color: "var(--text-soft)", fontSize: "var(--text-sm)", marginBottom: "14px" }}>
+                ลบข้อมูลทั้งหมดที่บันทึกไว้ในเบราว์เซอร์นี้
+              </p>
+              <button 
+                className="danger-button" 
+                type="button" 
+                onClick={handleWipeData}
+                style={{ padding: "8px 16px", fontWeight: "700" }}
+              >
+                ลบข้อมูลทั้งหมด
+              </button>
+            </div>
           </section>
         );
 
@@ -1010,7 +996,7 @@ export default function App() {
             {filterControls}
             {importPanel}
             <AccountStrip accountId={account} accounts={realAccounts} />
-            <MetricGrid metrics={metrics} />
+            <MetricGrid metrics={metrics} isLoading={isGlobalLoading} />
             <div className="analytics-layout">
               <CashflowChart rangeFactor={activeRange.factor} transactions={analyticTransactions} />
               <ExpenseDonut transactions={analyticTransactions} />
@@ -1029,10 +1015,8 @@ export default function App() {
           activeNavLabel={activeNavLabel}
           exportNote={exportNote}
           importOpen={importOpen}
-          profile={userProfile}
           onExport={handleExport}
           onImport={handleImportToggle}
-          onProfileClick={() => setActiveNav("settings")}
         />
         <div className="dashboard-content">{renderActiveView()}</div>
       </main>

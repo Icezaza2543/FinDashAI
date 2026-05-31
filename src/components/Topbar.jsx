@@ -5,12 +5,8 @@ export default function Topbar({
   importOpen,
   onImport,
   onExport,
-  onProfileClick,
   exportNote,
-  profile,
 }) {
-  const displayName = profile?.display_name || "ตั้งชื่อผู้ใช้";
-  const avatar = profile?.avatar_initial || displayName.trim().slice(0, 1) || "?";
 
   return (
     <header className="app-topbar">
@@ -34,16 +30,6 @@ export default function Topbar({
         <button className="icon-button" type="button" aria-label="ดูการแจ้งเตือน">
           <Bell size={19} />
           <span aria-hidden="true" />
-        </button>
-        <button
-          className="profile-button"
-          type="button"
-          onClick={onProfileClick}
-          aria-label={`โปรไฟล์ผู้ใช้ ${displayName}`}
-        >
-          <span>{avatar}</span>
-          <strong>{displayName}</strong>
-          <ChevronDown size={15} />
         </button>
         {exportNote ? <div className="toast-note">{exportNote}</div> : null}
       </div>

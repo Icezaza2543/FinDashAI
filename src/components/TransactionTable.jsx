@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CreditCard, Search, TrendingUp, Upload } from "lucide-react";
 import { categories as fallbackCategories } from "../data/filters";
 import { formatMoney } from "../utils/formatters";
@@ -29,18 +30,30 @@ export default function TransactionTable({
   filterCategories,
   onTransactionCategoryChange,
 }) {
+  const [hideCategorized, setHideCategorized] = useState(false);
   const catOptions = (categories && categories.length > 0)
     ? categories.map((c) => ({ id: c.id, label: c.label }))
     : fallbackCategories.filter((c) => c.id !== "all");
   const filterOptions = filterCategories?.length ? filterCategories : fallbackCategories;
+  
+  const displayedRows = hideCategorized ? rows.filter(r => r.categoryId === "cat-other" || !r.categoryId) : rows;
+
   return (
     <section className="panel transaction-panel">
       <div className="table-toolbar">
         <div>
           <h2>รายการล่าสุด</h2>
-          <p>{rows.length} รายการตรงกับตัวกรอง</p>
+          <p>{displayedRows.length} รายการตรงกับตัวกรอง</p>
         </div>
         <div className="table-actions">
+          <label className="toggle-field" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', cursor: 'pointer', color: 'var(--text-soft)' }}>
+            <input 
+              type="checkbox" 
+              checked={hideCategorized}
+              onChange={(e) => setHideCategorized(e.target.checked)}
+            />
+            ซ่อนที่จัดหมวดแล้ว
+          </label>
           <label className="search-field">
             <Search size={16} />
             <input
@@ -76,7 +89,7 @@ export default function TransactionTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {displayedRows.map((row) => (
               <tr key={row.id}>
                 <td>{formatDateShort(row.date)}</td>
                 <td>
@@ -109,7 +122,7 @@ export default function TransactionTable({
                 <td>{row.balance > 0 ? formatMoney(row.balance / 100) : "-"}</td>
               </tr>
             ))}
-            {rows.length === 0 ? (
+            {displayedRows.length === 0 ? (
               <tr>
                 <td className="empty-row" colSpan="7">
                   ไม่พบรายการที่ตรงกับตัวกรอง

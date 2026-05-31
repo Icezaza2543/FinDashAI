@@ -13,6 +13,7 @@ export default function CategoryManager({ categories = [], rules = [], onChanged
   const [categoryDraft, setCategoryDraft] = useState("");
   const [editingRuleId, setEditingRuleId] = useState("");
   const [ruleDraft, setRuleDraft] = useState({ pattern: "", category_id: "cat-other", priority: 60 });
+  const [activeTab, setActiveTab] = useState("categories");
 
   const showNote = (m, t = 2200) => {
     setNote(m);
@@ -168,79 +169,57 @@ export default function CategoryManager({ categories = [], rules = [], onChanged
 
   return (
     <div className="category-manager">
-      <div className="cm-header">
-        <div>
-          <h3>หมวดหมู่และกฎอัตโนมัติ</h3>
-          <p>กำหนดหมวดเอง + กฎจับคู่ข้อความ (contains/regex) สำหรับจัดหมวดตอนนำเข้าและปรับย้อนหลัง</p>
+      <div className="cm-tabs" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className={`cm-tab-btn ${activeTab === "categories" ? "active" : ""}`}
+            onClick={() => setActiveTab("categories")}
+          >
+            หมวดหมู่ ({categories.length})
+          </button>
+          <button
+            type="button"
+            className={`cm-tab-btn ${activeTab === "rules" ? "active" : ""}`}
+            onClick={() => setActiveTab("rules")}
+          >
+            กฎอัตโนมัติ ({rules.length})
+          </button>
         </div>
-        <button type="button" className="small-control" onClick={() => handleRecategorize(false)} disabled={busy}>
+        <button 
+          type="button" 
+          className="small-control" 
+          onClick={() => handleRecategorize(false)} 
+          disabled={busy}
+          style={{ marginBottom: '6px' }}
+        >
           <RefreshCw size={14} /> Re-apply Rules
         </button>
       </div>
 
       {note && <div className="cm-note">{note}</div>}
 
-      <div className="cm-grid">
-        {/* Add Category */}
-        <form className="cm-form" onSubmit={handleCreateCategory}>
-          <h4>เพิ่มหมวดหมู่ใหม่</h4>
-          <div className="cm-row">
-            <input
-              value={catLabel}
-              onChange={(e) => setCatLabel(e.target.value)}
-              placeholder="เช่น ค่าใช้จ่ายส่วนตัว, การศึกษา"
-              disabled={busy}
-            />
-            <button type="submit" className="add-button small" disabled={busy || !catLabel.trim()}>
-              <Plus size={15} /> เพิ่ม
-            </button>
-          </div>
-          <small className="cm-hint">หมวดเริ่มต้นระบบลบไม่ได้ถ้ามีธุรกรรมใช้อยู่</small>
-        </form>
+      {/* Categories Tab */}
+      {activeTab === "categories" && (
+        <div className="cm-tab-content">
+          <form className="cm-form" onSubmit={handleCreateCategory}>
+            <h4>เพิ่มหมวดหมู่ใหม่</h4>
+            <div className="cm-row">
+              <input
+                value={catLabel}
+                onChange={(e) => setCatLabel(e.target.value)}
+                placeholder="เช่น ค่าใช้จ่ายส่วนตัว, การศึกษา"
+                disabled={busy}
+              />
+              <button type="submit" className="add-button small" disabled={busy || !catLabel.trim()}>
+                <Plus size={15} /> เพิ่ม
+              </button>
+            </div>
+            <small className="cm-hint">หมวดเริ่มต้นระบบลบไม่ได้ถ้ามีธุรกรรมใช้อยู่</small>
+          </form>
 
-        {/* Add Rule */}
-        <form className="cm-form" onSubmit={handleCreateRule}>
-          <h4>เพิ่มกฎจับคู่ข้อความ → หมวด</h4>
-          <div className="cm-row">
-            <input
-              value={rulePattern}
-              onChange={(e) => setRulePattern(e.target.value)}
-              placeholder="เช่น grab|foodpanda|ร้านอาหาร (regex หรือคำ)"
-              disabled={busy}
-              style={{ flex: 1.6 }}
-            />
-            <select
-              value={ruleCatId}
-              onChange={(e) => setRuleCatId(e.target.value)}
-              disabled={busy}
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={rulePriority}
-              onChange={(e) => setRulePriority(Number(e.target.value) || 50)}
-              min={1}
-              max={999}
-              title="ลำดับความสำคัญ (สูง=ใช้ก่อน)"
-              style={{ width: 68 }}
-              disabled={busy}
-            />
-            <button type="submit" className="add-button small" disabled={busy || !rulePattern.trim()}>
-              <Plus size={15} /> เพิ่มกฎ
-            </button>
-          </div>
-          <small className="cm-hint">ตัวอย่าง: "shopee|ลาซาด้า" หรือ regex ".*(uber|grab).*" • กฎใหม่มีผลกับ import ใหม่ทันที</small>
-        </form>
-      </div>
-
-      {/* Lists */}
-      <div className="cm-lists">
-        <div className="cm-list">
-          <h4>หมวดหมู่ทั้งหมด ({categories.length})</h4>
-          <ul>
+          <div className="cm-list">
+            <ul>
             {categories.length === 0 && <li className="empty">ยังไม่มีหมวด</li>}
             {categories.map((c) => {
               const isSystem = String(c.id).startsWith("cat-") && !String(c.id).startsWith("cat-user-");
@@ -283,77 +262,119 @@ export default function CategoryManager({ categories = [], rules = [], onChanged
               );
             })}
           </ul>
+          </div>
         </div>
+      )}
 
-        <div className="cm-list rules">
-          <h4>กฎการจัดหมวด ({rules.length}) • สูง→ต่ำ</h4>
-          <ul>
-            {sortedRules.length === 0 && <li className="empty">ยังไม่มีกฎ (ใช้ค่าเริ่มต้น)</li>}
-            {sortedRules.map((r) => {
-              const cat = categories.find((c) => c.id === getRuleCategoryId(r));
-              const def = isDefaultRule(r);
-              const isEditing = editingRuleId === r.id;
-              return (
-                <li className={isEditing ? "editing rule-editing" : ""} key={r.id}>
-                  {isEditing ? (
-                    <>
-                      <input
-                        className="cm-edit-input rule"
-                        value={ruleDraft.pattern}
-                        onChange={(e) => setRuleDraft((draft) => ({ ...draft, pattern: e.target.value }))}
-                        disabled={busy}
-                        autoFocus
-                      />
-                      <select
-                        value={ruleDraft.category_id}
-                        onChange={(e) => setRuleDraft((draft) => ({ ...draft, category_id: e.target.value }))}
-                        disabled={busy}
-                      >
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>{c.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        className="cm-priority-input"
-                        type="number"
-                        min={1}
-                        max={999}
-                        value={ruleDraft.priority}
-                        onChange={(e) => setRuleDraft((draft) => ({ ...draft, priority: Number(e.target.value) || 50 }))}
-                        disabled={busy}
-                      />
-                      <button type="button" className="icon-btn confirm" onClick={() => handleUpdateRule(r.id)} disabled={busy || !ruleDraft.pattern.trim()} title="บันทึกกฎ">
-                        <Check size={14} />
-                      </button>
-                      <button type="button" className="icon-btn" onClick={cancelEditRule} disabled={busy} title="ยกเลิก">
-                        <X size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="rule-pattern" title={r.pattern}>/{r.pattern}/i</span>
-                      <span className="cm-meta">→ {cat?.label || getRuleCategoryId(r)}</span>
-                      <span className="cm-pri">P{r.priority || 0}</span>
-                      {!def && (
-                        <>
-                          <button type="button" className="icon-btn" onClick={() => startEditRule(r)} disabled={busy} title="แก้ไขกฎกำหนดเอง">
-                            <Pencil size={14} />
-                          </button>
-                          <button type="button" className="icon-btn danger" onClick={() => handleDeleteRule(r.id, r.pattern)} disabled={busy} title="ลบกฎกำหนดเอง">
-                            <Trash2 size={14} />
-                          </button>
-                        </>
-                      )}
-                      {def && <span className="cm-meta">ค่าเริ่มต้น</span>}
-                    </>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          <small className="cm-hint">กฎค่าเริ่มต้นระบบไม่สามารถลบได้จากที่นี่ (เพื่อความปลอดภัย) • สามารถ override ด้วยกฎ custom ที่ priority สูงกว่า</small>
+      {/* Rules Tab */}
+      {activeTab === "rules" && (
+        <div className="cm-tab-content">
+          <form className="cm-form" onSubmit={handleCreateRule}>
+            <h4>เพิ่มกฎจับคู่ข้อความ → หมวด</h4>
+            <div className="cm-row">
+              <input
+                value={rulePattern}
+                onChange={(e) => setRulePattern(e.target.value)}
+                placeholder="เช่น grab|foodpanda|ร้านอาหาร (regex หรือคำ)"
+                disabled={busy}
+                style={{ flex: 1.6 }}
+              />
+              <select
+                value={ruleCatId}
+                onChange={(e) => setRuleCatId(e.target.value)}
+                disabled={busy}
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={rulePriority}
+                onChange={(e) => setRulePriority(Number(e.target.value) || 50)}
+                min={1}
+                max={999}
+                title="ลำดับความสำคัญ (สูง=ใช้ก่อน)"
+                style={{ width: 68 }}
+                disabled={busy}
+              />
+              <button type="submit" className="add-button small" disabled={busy || !rulePattern.trim()}>
+                <Plus size={15} /> เพิ่มกฎ
+              </button>
+            </div>
+            <small className="cm-hint">ตัวอย่าง: "shopee|ลาซาด้า" หรือ regex ".*(uber|grab).*" • กฎใหม่มีผลกับ import ใหม่ทันที</small>
+          </form>
+
+          <div className="cm-list rules">
+            <ul>
+
+              {sortedRules.length === 0 && <li className="empty">ยังไม่มีกฎ (ใช้ค่าเริ่มต้น)</li>}
+              {sortedRules.map((r) => {
+                const cat = categories.find((c) => c.id === getRuleCategoryId(r));
+                const def = isDefaultRule(r);
+                const isEditing = editingRuleId === r.id;
+                return (
+                  <li className={isEditing ? "editing rule-editing" : ""} key={r.id}>
+                    {isEditing ? (
+                      <>
+                        <input
+                          className="cm-edit-input rule"
+                          value={ruleDraft.pattern}
+                          onChange={(e) => setRuleDraft((draft) => ({ ...draft, pattern: e.target.value }))}
+                          disabled={busy}
+                          autoFocus
+                        />
+                        <select
+                          value={ruleDraft.category_id}
+                          onChange={(e) => setRuleDraft((draft) => ({ ...draft, category_id: e.target.value }))}
+                          disabled={busy}
+                        >
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>{c.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          className="cm-priority-input"
+                          type="number"
+                          min={1}
+                          max={999}
+                          value={ruleDraft.priority}
+                          onChange={(e) => setRuleDraft((draft) => ({ ...draft, priority: Number(e.target.value) || 50 }))}
+                          disabled={busy}
+                        />
+                        <button type="button" className="icon-btn confirm" onClick={() => handleUpdateRule(r.id)} disabled={busy || !ruleDraft.pattern.trim()} title="บันทึกกฎ">
+                          <Check size={14} />
+                        </button>
+                        <button type="button" className="icon-btn" onClick={cancelEditRule} disabled={busy} title="ยกเลิก">
+                          <X size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="rule-pattern" title={r.pattern}>/{r.pattern}/i</span>
+                        <span className="cm-meta">→ {cat?.label || getRuleCategoryId(r)}</span>
+                        <span className="cm-pri">P{r.priority || 0}</span>
+                        {!def && (
+                          <>
+                            <button type="button" className="icon-btn" onClick={() => startEditRule(r)} disabled={busy} title="แก้ไขกฎกำหนดเอง">
+                              <Pencil size={14} />
+                            </button>
+                            <button type="button" className="icon-btn danger" onClick={() => handleDeleteRule(r.id, r.pattern)} disabled={busy} title="ลบกฎกำหนดเอง">
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                        {def && <span className="cm-meta">ค่าเริ่มต้น</span>}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <small className="cm-hint">กฎค่าเริ่มต้นระบบไม่สามารถลบได้จากที่นี่ (เพื่อความปลอดภัย) • สามารถ override ด้วยกฎ custom ที่ priority สูงกว่า</small>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="cm-actions">
         <button type="button" className="small-control" onClick={() => handleRecategorize(true)} disabled={busy}>

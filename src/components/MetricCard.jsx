@@ -1,6 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
-export default function MetricCard({ label, value, detail, icon: Icon, tone, trend }) {
+export default function MetricCard({ label, value, detail, icon: Icon, tone, trend, isLoading }) {
   const TrendIcon = trend === "down" ? ArrowDownRight : ArrowUpRight;
 
   return (
@@ -14,10 +14,12 @@ export default function MetricCard({ label, value, detail, icon: Icon, tone, tre
         <span />
       </div>
       <span>{label}</span>
-      <strong>{value}</strong>
-      <small>
-        {detail}
-        <TrendIcon size={14} />
+      <strong className={isLoading ? "skeleton-loader" : ""}>
+        {isLoading ? "0.00" : value}
+      </strong>
+      <small className={isLoading ? "skeleton-loader" : ""}>
+        {isLoading ? "กำลังโหลด..." : detail}
+        {!isLoading && <TrendIcon size={14} />}
       </small>
     </article>
   );

@@ -113,10 +113,25 @@ export default function CashflowChart({ rangeFactor = 1, transactions = [], defa
 
             return (
               <div className="cash-day" key={`${item.key}-${index}`}>
-                <div className="net-point" style={{ bottom: `${netHeight}%` }} title={`สุทธิ ${item.incomeRaw - item.expenseRaw} บาท`} />
+                <div className="chart-tooltip">
+                  <strong>{item.label}</strong>
+                  <div>
+                    <span>รายรับ</span>
+                    <span className="inc-val">{item.incomeRaw.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span>รายจ่าย</span>
+                    <span className="exp-val">{item.expenseRaw.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span>สุทธิ</span>
+                    <span className="net-val">{(item.incomeRaw - item.expenseRaw).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="net-point" style={{ bottom: `${netHeight}%` }} />
                 <div className="cash-bars">
-                  <span className="income-bar" style={{ height: `${item.income || 8}%` }} title={`รายรับ ${item.incomeRaw} บาท`} />
-                  <span className="expense-bar" style={{ height: `${item.expense || 8}%` }} title={`รายจ่าย ${item.expenseRaw} บาท`} />
+                  <span className="income-bar" style={{ height: `${item.income || 8}%` }} />
+                  <span className="expense-bar" style={{ height: `${item.expense || 8}%` }} />
                 </div>
                 <em>{item.label}</em>
               </div>

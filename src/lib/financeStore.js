@@ -105,10 +105,6 @@ function openIDB() {
       if (!database.objectStoreNames.contains('goals')) {
         database.createObjectStore('goals', { keyPath: 'id' });
       }
-      // profile (single record with id=1)
-      if (!database.objectStoreNames.contains('profile')) {
-        database.createObjectStore('profile', { keyPath: 'id' });
-      }
       // categories
       if (!database.objectStoreNames.contains('categories')) {
         database.createObjectStore('categories', { keyPath: 'id' });
@@ -285,23 +281,6 @@ async function seedDefaults() {
       });
     }
   }
-
-  // profile
-  await withIDBStore('profile', 'readwrite', ({ store, useLS, data }) => {
-    if (useLS || data) {
-      if (!data.profile) {
-        data.profile = { id: 1, display_name: '', avatar_initial: '', email: '', created_at: nowIso(), updated_at: nowIso() };
-      }
-      return { _write: true, data };
-    }
-    if (!store) return;
-    const getReq = store.get(1);
-    getReq.onsuccess = () => {
-      if (!getReq.result) {
-        store.put({ id: 1, display_name: '', avatar_initial: '', email: '', created_at: nowIso(), updated_at: nowIso() });
-      }
-    };
-  });
 
   // cleanup legacy mock accounts (no-op if none)
   await cleanupLegacyMockAccounts();
@@ -1361,6 +1340,31 @@ const financeStore = {
       encoding_used: parsed.encoding,
       detected_bank: parsed.detectedBank,
     };
+  },
+
+  async wipeAllData() {
+    memoryFallback = null;
+    if (typeof localStorage !== 'undefined') {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('findash_')) localStorage.removeItem(key);
+      });
+    }
+    if (typeof indexedDB !== 'undefined') {
+      if (dbPromise) {
+        const db = await dbPromise;
+        if (db) db.close();
+      }
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => {
+          dbPromise = null;
+          resolve(true);
+        };
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => resolve(true);
+      });
+    }
+    return Promise.resolve(true);
   },
 };
 

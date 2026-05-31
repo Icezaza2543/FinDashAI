@@ -2,7 +2,7 @@ import { LineChart, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import MetricCard from "./MetricCard";
 import { formatMoney, formatPlain } from "../utils/formatters";
 
-export default function MetricGrid({ metrics }) {
+export default function MetricGrid({ metrics, isLoading }) {
   return (
     <section className="metric-grid" aria-label="ตัวเลขสำคัญ">
       <MetricCard
@@ -11,6 +11,7 @@ export default function MetricGrid({ metrics }) {
         detail="คำนวณจากข้อมูลจริงในตัวกรอง"
         icon={TrendingUp}
         tone="income"
+        isLoading={isLoading}
       />
       <MetricCard
         label="รายจ่าย"
@@ -19,6 +20,7 @@ export default function MetricGrid({ metrics }) {
         icon={TrendingDown}
         tone="expense"
         trend="down"
+        isLoading={isLoading}
       />
       <MetricCard
         label="เงินคงเหลือ"
@@ -26,6 +28,7 @@ export default function MetricGrid({ metrics }) {
         detail="รวมจากบัญชีที่บันทึกไว้"
         icon={WalletCards}
         tone="balance"
+        isLoading={isLoading}
       />
       <MetricCard
         label="อัตราออม"
@@ -33,6 +36,7 @@ export default function MetricGrid({ metrics }) {
         detail={metrics.income > 0 ? "รายรับเทียบรายจ่ายจริง" : "ยังไม่มีรายรับในตัวกรอง"}
         icon={LineChart}
         tone="savings"
+        isLoading={isLoading}
       />
     </section>
   );

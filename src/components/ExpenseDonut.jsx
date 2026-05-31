@@ -27,7 +27,7 @@ export default function ExpenseDonut({ transactions = [] }) {
       categories = Object.entries(expenseByCategory)
         .map(([label, amount], index) => {
           const value = Math.round((amount / totalExpense) * 1000) / 10; // 1 decimal
-          const colors = ["#1d77d2", "#7c4dba", "#0e9f6e", "#f5a623", "#ef4444", "#0891b2", "#94a3b8"];
+          const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#6366f1", "#94a3b8"];
           return {
             label,
             amount,
