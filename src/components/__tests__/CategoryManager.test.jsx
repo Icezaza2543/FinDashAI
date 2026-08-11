@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CategoryManager from '../CategoryManager';
@@ -33,6 +32,10 @@ describe('CategoryManager', () => {
 
     expect(screen.getAllByText('Food').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Custom').length).toBeGreaterThan(0);
+
+    // Switch to auto-rules tab to view rule items
+    const rulesTabBtn = screen.getByRole('button', { name: /กฎอัตโนมัติ/ });
+    fireEvent.click(rulesTabBtn);
     expect(screen.getByTitle('coffee')).toBeInTheDocument();
   });
 

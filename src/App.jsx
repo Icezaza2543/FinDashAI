@@ -14,6 +14,9 @@ import InsightPanel from "./components/InsightPanel";
 import ProfitabilityPanel from "./components/ProfitabilityPanel";
 import CategoryManager from "./components/CategoryManager";
 import ReportsAnalytics from "./components/ReportsAnalytics";
+import AccountForm from "./components/AccountForm";
+import BudgetForm from "./components/BudgetForm";
+import GoalForm from "./components/GoalForm";
 
 import { ranges, navItems } from "./data/filters";
 import { formatMoney } from "./utils/formatters";
@@ -38,12 +41,6 @@ const EMPTY_GOAL_DRAFT = {
   target_amount: "0",
   saved_amount: "0",
 };
-
-const ACCOUNT_TYPE_OPTIONS = [
-  { id: "bank", label: "บัญชีธนาคาร" },
-  { id: "credit", label: "บัตรเครดิต" },
-  { id: "cash", label: "เงินสด" },
-];
 
 const ACCOUNT_TYPE_LABELS = {
   bank: "บัญชีธนาคาร",
@@ -502,159 +499,21 @@ export default function App() {
   const importPanel = <ImportPanel visible={importOpen} onImported={handleImportComplete} />;
 
   const renderAccountForm = (draft, onChange, submitLabel, disabled = false) => (
-    <div className="editor-grid">
-      <label className="field-stack">
-        <span>ชื่อบัญชี</span>
-        <input
-          value={draft.name}
-          onChange={(event) => onChange("name", event.target.value)}
-          placeholder="เช่น เงินเดือน, ใช้จ่ายประจำ"
-          disabled={disabled}
-        />
-      </label>
-      <label className="field-stack">
-        <span>ธนาคาร/สถาบัน</span>
-        <input
-          list="thai-banks"
-          value={draft.institution}
-          onChange={(event) => onChange("institution", event.target.value)}
-          placeholder="ค้นหาหรือพิมพ์ชื่อสถาบัน..."
-          disabled={disabled}
-          autoComplete="off"
-        />
-        <datalist id="thai-banks">
-          <option value="KBank (กสิกรไทย)" />
-          <option value="SCB (ไทยพาณิชย์)" />
-          <option value="BBL (กรุงเทพ)" />
-          <option value="KTB (กรุงไทย)" />
-          <option value="Krungsri (กรุงศรีอยุธยา)" />
-          <option value="TTB (ทหารไทยธนชาต)" />
-          <option value="UOB (ยูโอบี)" />
-          <option value="CIMB (ซีไอเอ็มบี ไทย)" />
-          <option value="GSB (ออมสิน)" />
-          <option value="GHB (ธอส.)" />
-          <option value="BAAC (ธ.ก.ส.)" />
-          <option value="TISCO (ทิสโก้)" />
-          <option value="KKP (เกียรตินาคินภัทร)" />
-          <option value="LHBANK (แลนด์ แอนด์ เฮ้าส์)" />
-          <option value="ICBC (ไอซีบีซี ไทย)" />
-          <option value="Standard Chartered" />
-          <option value="Citibank" />
-          <option value="TrueMoney Wallet" />
-          <option value="ShopeePay" />
-          <option value="Rabbit LINE Pay" />
-          <option value="Kept by krungsri" />
-          <option value="Make by KBank" />
-          <option value="Dime!" />
-          <option value="เงินสด (Cash)" />
-        </datalist>
-      </label>
-      <label className="field-stack">
-        <span>ประเภท</span>
-        <select
-          value={draft.type}
-          onChange={(event) => onChange("type", event.target.value)}
-          disabled={disabled}
-        >
-          {ACCOUNT_TYPE_OPTIONS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field-stack">
-        <span>ยอดคงเหลือ (บาท)</span>
-        <input
-          type="number"
-          step="0.01"
-          value={draft.current_balance}
-          onChange={(event) => onChange("current_balance", event.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <button className="add-button" type="submit" disabled={disabled}>
-        {submitLabel}
-      </button>
-    </div>
+    <AccountForm draft={draft} onChange={onChange} submitLabel={submitLabel} disabled={disabled} />
   );
 
   const renderBudgetForm = (draft, onChange, submitLabel, disabled = false) => (
-    <div className="editor-grid budget-editor-grid">
-      <label className="field-stack">
-        <span>หมวดหมู่</span>
-        <select
-          value={draft.category_id}
-          onChange={(event) => onChange("category_id", event.target.value)}
-          disabled={disabled}
-        >
-          {(realCategories.length > 0 ? realCategories.filter((c) => c.id !== "cat-income") : [
-            { id: "cat-food", label: "อาหารและเครื่องดื่ม" },
-            { id: "cat-housing", label: "ที่อยู่อาศัย" },
-            { id: "cat-transport", label: "การเดินทาง" },
-            { id: "cat-utility", label: "สาธารณูปโภค" },
-            { id: "cat-shopping", label: "ช้อปปิ้ง" },
-            { id: "cat-health", label: "สุขภาพ" },
-            { id: "cat-entertainment", label: "ความบันเทิง" },
-            { id: "cat-other", label: "อื่น ๆ" },
-          ]).map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field-stack">
-        <span>งบต่อเดือน (บาท)</span>
-        <input
-          type="number"
-          step="0.01"
-          value={draft.monthly_limit}
-          onChange={(event) => onChange("monthly_limit", event.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <button className="add-button" type="submit" disabled={disabled}>
-        {submitLabel}
-      </button>
-    </div>
+    <BudgetForm
+      draft={draft}
+      categories={realCategories}
+      onChange={onChange}
+      submitLabel={submitLabel}
+      disabled={disabled}
+    />
   );
 
   const renderGoalForm = (draft, onChange, submitLabel, disabled = false) => (
-    <div className="editor-grid goal-editor-grid">
-      <label className="field-stack">
-        <span>ชื่อเป้าหมาย</span>
-        <input
-          value={draft.label}
-          onChange={(event) => onChange("label", event.target.value)}
-          placeholder="เช่น เงินสำรองฉุกเฉิน"
-          disabled={disabled}
-        />
-      </label>
-      <label className="field-stack">
-        <span>เป้าหมาย (บาท)</span>
-        <input
-          type="number"
-          step="0.01"
-          value={draft.target_amount}
-          onChange={(event) => onChange("target_amount", event.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <label className="field-stack">
-        <span>ออมแล้ว (บาท)</span>
-        <input
-          type="number"
-          step="0.01"
-          value={draft.saved_amount}
-          onChange={(event) => onChange("saved_amount", event.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <button className="add-button" type="submit" disabled={disabled}>
-        {submitLabel}
-      </button>
-    </div>
+    <GoalForm draft={draft} onChange={onChange} submitLabel={submitLabel} disabled={disabled} />
   );
 
   const renderActiveView = () => {

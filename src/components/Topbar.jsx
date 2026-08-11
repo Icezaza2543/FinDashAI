@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Download, Upload } from "lucide-react";
+import { Bell, Download, Upload } from "lucide-react";
 
 export default function Topbar({
   activeNavLabel,
