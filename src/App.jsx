@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -18,7 +18,7 @@ import AccountForm from "./components/AccountForm";
 import BudgetForm from "./components/BudgetForm";
 import GoalForm from "./components/GoalForm";
 
-import { ranges, navItems } from "./data/filters";
+import { navItems } from "./data/filters";
 import { formatMoney } from "./utils/formatters";
 import financeStore from "./lib/financeStore";
 
@@ -48,7 +48,30 @@ const ACCOUNT_TYPE_LABELS = {
   cash: "เงินสด",
 };
 
-// BUDGET_CATEGORY_OPTIONS removed - now dynamic from realCategories in renderBudgetForm
+function matchesDateRange(dateStr, rangeId) {
+  if (rangeId === "all" || !dateStr) return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+  if (rangeId === "1m") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    return d >= cutoff;
+  }
+  if (rangeId === "3m") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    return d >= cutoff;
+  }
+  if (rangeId === "6m") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+    return d >= cutoff;
+  }
+  if (rangeId === "this_year") {
+    const cutoff = new Date(now.getFullYear(), 0, 1);
+    return d >= cutoff;
+  }
+  return true;
+}
 
 function bahtToSatang(value) {
   const amount = Number(String(value || "0").replace(/,/g, ""));
@@ -108,6 +131,8 @@ export default function App() {
   const [accountDrafts, setAccountDrafts] = useState({});
   const [budgetDrafts, setBudgetDrafts] = useState({});
   const [goalDrafts, setGoalDrafts] = useState({});
+
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -199,7 +224,6 @@ export default function App() {
     [realAccounts],
   );
 
-  const activeRange = ranges.find((item) => item.id === range) ?? ranges[0];
   const activeNavLabel = navItems.find((item) => item.id === activeNav)?.label ?? "ภาพรวมการเงิน";
   const transactionCategoryOptions = useMemo(
     () => [
@@ -249,6 +273,7 @@ export default function App() {
     const query = search.trim().toLowerCase();
 
     return normalizedTransactions.filter((row) => {
+      const rangeMatch = matchesDateRange(row.date, range);
       const accountMatch = account === "all" || row.account === account;
       const sourceMatch = source === "all" || row.source === source;
       const categoryMatch = category === "all" || row.categoryId === category || row.category === category;
@@ -258,18 +283,19 @@ export default function App() {
           String(value || "").toLowerCase().includes(query),
         );
 
-      return accountMatch && sourceMatch && categoryMatch && searchMatch;
+      return rangeMatch && accountMatch && sourceMatch && categoryMatch && searchMatch;
     });
-  }, [account, category, normalizedTransactions, search, source]);
+  }, [account, category, normalizedTransactions, range, search, source]);
 
   const analyticTransactions = filteredTransactions;
 
   const realMetrics = useMemo(() => {
     const filtered = normalizedTransactions.filter((row) => {
+      const rangeMatch = matchesDateRange(row.date, range);
       const accountMatch = account === "all" || row.account === account;
       const sourceMatch = source === "all" || row.source === source;
       const categoryMatch = category === "all" || row.categoryId === category || row.category === category;
-      return accountMatch && sourceMatch && categoryMatch;
+      return rangeMatch && accountMatch && sourceMatch && categoryMatch;
     });
 
     const income = filtered.reduce((sum, row) => sum + (row.income || 0), 0);
@@ -286,7 +312,7 @@ export default function App() {
       balance: currentBalance,
       savingsRate,
     };
-  }, [account, accountById, category, normalizedTransactions, realAccounts, source]);
+  }, [account, accountById, category, normalizedTransactions, range, realAccounts, source]);
 
   const metrics = useMemo(
     () => ({
@@ -299,8 +325,9 @@ export default function App() {
   );
 
   const showNote = (message, timeout = 2200) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setExportNote(message);
-    window.setTimeout(() => setExportNote(""), timeout);
+    toastTimerRef.current = window.setTimeout(() => setExportNote(""), timeout);
   };
 
   const handleRefresh = () => {
@@ -784,7 +811,7 @@ export default function App() {
           <>
             {filterControls}
             <div className="view-grid reports-grid">
-              <CashflowChart defaultPeriod="monthly" rangeFactor={activeRange.factor} transactions={analyticTransactions} />
+              <CashflowChart defaultPeriod="monthly" transactions={analyticTransactions} />
               <ExpenseDonut transactions={analyticTransactions} />
               <ProfitabilityPanel
                 accountCount={realAccounts.length}
@@ -857,7 +884,7 @@ export default function App() {
             <AccountStrip accountId={account} accounts={realAccounts} />
             <MetricGrid metrics={metrics} isLoading={isGlobalLoading} />
             <div className="analytics-layout">
-              <CashflowChart rangeFactor={activeRange.factor} transactions={analyticTransactions} />
+              <CashflowChart transactions={analyticTransactions} />
               <ExpenseDonut transactions={analyticTransactions} />
               <BudgetPanel budgets={realBudgets} transactions={analyticTransactions} />
             </div>

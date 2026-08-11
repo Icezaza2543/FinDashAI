@@ -2,6 +2,10 @@
 
 export const ranges = [
   { id: "all", label: "ทั้งหมด", short: "ทั้งหมด", factor: 1 },
+  { id: "1m", label: "1 เดือนล่าสุด", short: "1 เดือน", factor: 1 },
+  { id: "3m", label: "3 เดือนล่าสุด", short: "3 เดือน", factor: 1 },
+  { id: "6m", label: "6 เดือนล่าสุด", short: "6 เดือน", factor: 1 },
+  { id: "this_year", label: "ปีนี้", short: "ปีนี้", factor: 1 },
 ];
 
 export const sources = [

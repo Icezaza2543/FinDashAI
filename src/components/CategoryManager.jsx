@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Check, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import financeStore from "../lib/financeStore";
 
@@ -15,9 +15,12 @@ export default function CategoryManager({ categories = [], rules = [], onChanged
   const [ruleDraft, setRuleDraft] = useState({ pattern: "", category_id: "cat-other", priority: 60 });
   const [activeTab, setActiveTab] = useState("categories");
 
+  const noteTimerRef = useRef(null);
+
   const showNote = (m, t = 2200) => {
+    if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
     setNote(m);
-    window.setTimeout(() => setNote(""), t);
+    noteTimerRef.current = window.setTimeout(() => setNote(""), t);
   };
 
   const refresh = () => {

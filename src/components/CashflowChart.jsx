@@ -17,7 +17,7 @@ function formatYearLabel(y) {
   return String(y);
 }
 
-export default function CashflowChart({ rangeFactor = 1, transactions = [], defaultPeriod = "monthly" }) {
+export default function CashflowChart({ transactions = [], defaultPeriod = "monthly" }) {
   const [period, setPeriod] = useState(defaultPeriod);
   const hasRealData = transactions.length > 0;
   const currentOpt = PERIOD_OPTIONS.find((p) => p.id === period) || PERIOD_OPTIONS[1];
@@ -109,7 +109,7 @@ export default function CashflowChart({ rangeFactor = 1, transactions = [], defa
       ) : (
         <div className="cash-chart" aria-label={`กราฟกระแสเงินสด ${viewLabel}`}>
           {chartData.map((item, index) => {
-            const netHeight = Math.max(10, Math.min(93, (item.net || 0) * 1.48 * Math.min(rangeFactor, 1.3)));
+            const netHeight = Math.max(10, Math.min(93, (item.net || 0) * 1.48));
 
             return (
               <div className="cash-day" key={`${item.key}-${index}`}>

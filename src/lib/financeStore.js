@@ -128,8 +128,14 @@ function openIDB() {
     };
 
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  }).catch(() => null);
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
+  }).catch(() => {
+    dbPromise = null;
+    return null;
+  });
 
   return dbPromise;
 }
@@ -1010,7 +1016,6 @@ async function recategorizeTransactions({ force = false } = {}) {
   await init();
   const rules = await getRules();
   const catMap = await getCategoryMap();
-  let updatedCount = 0;
   let skippedManual = 0;
 
   // Load all transactions for processing (small local dataset)
@@ -1024,42 +1029,49 @@ async function recategorizeTransactions({ force = false } = {}) {
     });
   });
 
+  const updates = [];
   for (const tx of allTx) {
-    if (!force && (tx.category_source === 'manual')) {
+    if (!force && tx.category_source === 'manual') {
       skippedManual += 1;
       continue;
     }
     const newCatId = categorize({ title: tx.title, amountSatang: tx.amount }, rules);
     if (newCatId && newCatId !== tx.category_id) {
       const newLabel = catMap.get(newCatId) || 'อื่น ๆ';
-      await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
-        if (useLS || data) {
-          const t = (data.transactions || []).find((x) => x.id === tx.id);
-          if (t) {
-            t.category_id = newCatId;
-            t.category_label = newLabel;
-            t.category_source = 'rule';
-            t.updated_at = nowIso();
-          }
-          return { _write: true, data };
-        }
-        if (!store) return;
-        const g = store.get(tx.id);
-        g.onsuccess = () => {
-          if (g.result) {
-            g.result.category_id = newCatId;
-            g.result.category_label = newLabel;
-            g.result.category_source = 'rule';
-            g.result.updated_at = nowIso();
-            store.put(g.result);
-          }
-        };
+      updates.push({
+        id: tx.id,
+        category_id: newCatId,
+        category_label: newLabel,
+        category_source: 'rule',
+        updated_at: nowIso(),
       });
-      updatedCount += 1;
     }
   }
 
-  return { updated: updatedCount, skippedManual, total: allTx.length };
+  if (updates.length > 0) {
+    await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
+      if (useLS || data) {
+        const updateMap = new Map(updates.map((u) => [u.id, u]));
+        data.transactions = (data.transactions || []).map((t) => {
+          const u = updateMap.get(t.id);
+          return u ? { ...t, ...u } : t;
+        });
+        return { _write: true, data };
+      }
+      if (!store) return;
+      for (const item of updates) {
+        const g = store.get(item.id);
+        g.onsuccess = () => {
+          if (g.result) {
+            Object.assign(g.result, item);
+            store.put(g.result);
+          }
+        };
+      }
+    });
+  }
+
+  return { updated: updates.length, skippedManual, total: allTx.length };
 }
 
 // --- end category/rule management ---
@@ -1078,60 +1090,48 @@ async function importTransactions({ parsed, accountId }) {
   const rules = await getRules();
   const catMap = await getCategoryMap();
 
-  let imported = 0;
-  let skipped = 0;
-  let insertedAmount = 0;
   const importedAt = nowIso();
   const batchId = cryptoRandomId();
 
-  // create batch record (light)
-  await withIDBStore('import_batches', 'readwrite', ({ store, useLS, data }) => {
-    const rec = {
-      id: batchId,
-      file_name: parsed.fileName || 'upload',
-      file_path: '', // browser has no path
-      account_id: accountId,
-      encoding_used: parsed.encoding || 'UTF-8',
-      detected_bank: parsed.detectedBank || 'อัตโนมัติ',
-      total_rows: parsed.transactions.length,
-      imported_count: 0,
-      skipped_count: 0,
-      created_at: importedAt,
-    };
-    if (useLS || data) {
-      data.import_batches = data.import_batches || [];
-      data.import_batches.push(rec);
-      return { _write: true, data };
-    }
-    if (!store) return;
-    store.add(rec);
+  // Fetch all existing transaction fingerprints in a single read pass
+  const existingFps = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+    if (useLS || data) return new Set((data.transactions || []).map((t) => t.fingerprint));
+    if (!store) return new Set();
+    return new Promise((res) => {
+      const set = new Set();
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          if (cursor.value.fingerprint) set.add(cursor.value.fingerprint);
+          cursor.continue();
+        } else {
+          res(set);
+        }
+      };
+      req.onerror = () => res(new Set());
+    });
   });
+
+  const recordsToInsert = [];
+  let skipped = 0;
+  let insertedAmount = 0;
 
   for (const tx of parsed.transactions) {
     const fp = createFingerprint(accountId, tx);
-    const txId = `tx-${fp}`;
-
-    const exists = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
-      if (useLS || data) return (data.transactions || []).some((t) => t.fingerprint === fp);
-      if (!store) return false;
-      return new Promise((res) => {
-        const idx = store.index('fingerprint');
-        const req = idx.get(fp);
-        req.onsuccess = () => res(!!req.result);
-        req.onerror = () => res(false);
-      });
-    });
-
-    if (exists) {
+    if (existingFps.has(fp)) {
       skipped += 1;
       continue;
     }
 
+    existingFps.add(fp); // prevent internal duplicate rows within the same statement file
+
     const categoryId = categorize(tx, rules);
     const income = tx.amountSatang > 0 ? tx.amountSatang : 0;
     const expense = tx.amountSatang < 0 ? Math.abs(tx.amountSatang) : 0;
+    const txId = `tx-${fp}`;
 
-    const record = {
+    recordsToInsert.push({
       id: txId,
       fingerprint: fp,
       account_id: accountId,
@@ -1147,41 +1147,52 @@ async function importTransactions({ parsed, accountId }) {
       raw_row: tx.rowNumber,
       imported_at: importedAt,
       category_label: catMap.get(categoryId) || 'อื่น ๆ',
-    };
-
-    await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
-      if (useLS || data) {
-        data.transactions = data.transactions || [];
-        data.transactions.push(record);
-        return { _write: true, data };
-      }
-      if (!store) return;
-      store.add(record);
     });
 
     insertedAmount += tx.amountSatang;
-    imported += 1;
   }
 
-  // update batch counts
+  const imported = recordsToInsert.length;
+
+  // 1. Create batch record
   await withIDBStore('import_batches', 'readwrite', ({ store, useLS, data }) => {
+    const rec = {
+      id: batchId,
+      file_name: parsed.fileName || 'upload',
+      file_path: '',
+      account_id: accountId,
+      encoding_used: parsed.encoding || 'UTF-8',
+      detected_bank: parsed.detectedBank || 'อัตโนมัติ',
+      total_rows: parsed.transactions.length,
+      imported_count: imported,
+      skipped_count: skipped,
+      created_at: importedAt,
+    };
     if (useLS || data) {
-      const b = (data.import_batches || []).find((x) => x.id === batchId);
-      if (b) { b.imported_count = imported; b.skipped_count = skipped; }
+      data.import_batches = data.import_batches || [];
+      data.import_batches.push(rec);
       return { _write: true, data };
     }
     if (!store) return;
-    const getB = store.get(batchId);
-    getB.onsuccess = () => {
-      if (getB.result) {
-        getB.result.imported_count = imported;
-        getB.result.skipped_count = skipped;
-        store.put(getB.result);
-      }
-    };
+    store.add(rec);
   });
 
-  // update account balance
+  // 2. Write all transaction records in bulk
+  if (recordsToInsert.length > 0) {
+    await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
+      if (useLS || data) {
+        data.transactions = data.transactions || [];
+        data.transactions.push(...recordsToInsert);
+        return { _write: true, data };
+      }
+      if (!store) return;
+      for (const record of recordsToInsert) {
+        store.add(record);
+      }
+    });
+  }
+
+  // 3. Update account balance
   if (insertedAmount !== 0) {
     await withIDBStore('accounts', 'readwrite', ({ store, useLS, data }) => {
       if (useLS || data) {

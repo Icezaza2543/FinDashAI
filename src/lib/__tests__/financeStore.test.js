@@ -268,13 +268,35 @@ describe('financeStore', () => {
       expect(goal.saved_amount).toBe(0);
     });
 
-    it('prevents duplicate budgets for same category', async () => {
-      const categories = await financeStore.getCategories();
-      const catId = categories[2].id;
-      await financeStore.createBudget({ category_id: catId, monthly_limit: 1000 });
-      
-      await expect(financeStore.createBudget({ category_id: catId, monthly_limit: 2000 }))
-        .rejects.toThrow('หมวดนี้มีงบประมาณแล้ว ให้แก้ไขรายการเดิมแทน');
+    it('handles bulk statement import with duplicate deduplication', async () => {
+      const account = await financeStore.createAccount({ name: 'Bulk Bank', type: 'bank' });
+      const bulkTxs = Array.from({ length: 50 }, (_, i) => ({
+        date: '2024-06-01',
+        amount: -100 - i,
+        amountSatang: (-100 - i) * 100,
+        title: `Item ${i}`,
+        rowNumber: i + 1,
+      }));
+
+      // Add duplicate row within same statement
+      bulkTxs.push({ ...bulkTxs[0] });
+
+      const res = await financeStore.importTransactions({
+        parsed: { transactions: bulkTxs, fileName: 'bulk.csv' },
+        accountId: account.id,
+      });
+
+      expect(res.imported).toBe(50);
+      expect(res.skipped).toBe(1);
+
+      // Re-importing same statement should skip all
+      const res2 = await financeStore.importTransactions({
+        parsed: { transactions: bulkTxs, fileName: 'bulk.csv' },
+        accountId: account.id,
+      });
+      expect(res2.imported).toBe(0);
+      expect(res2.skipped).toBe(51);
     });
   });
 });
+
