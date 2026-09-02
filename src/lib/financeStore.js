@@ -1,47 +1,76 @@
 // Local-first finance data store for browser (IndexedDB primary, localStorage fallback).
 // All data stays in the user's browser with a versioned schema for future migrations.
 
-const DB_NAME = 'findash-finance';
-const DB_VERSION = 1;
+const DB_NAME = "findash-finance";
+const DB_VERSION = 2;
 
 const DEFAULT_CATEGORIES = [
-  { id: 'cat-income', label: 'รายได้ประจำ' },
-  { id: 'cat-food', label: 'อาหารและเครื่องดื่ม' },
-  { id: 'cat-housing', label: 'ที่อยู่อาศัย' },
-  { id: 'cat-transport', label: 'การเดินทาง' },
-  { id: 'cat-utility', label: 'สาธารณูปโภค' },
-  { id: 'cat-shopping', label: 'ช้อปปิ้ง' },
-  { id: 'cat-health', label: 'สุขภาพ' },
-  { id: 'cat-entertainment', label: 'ความบันเทิง' },
-  { id: 'cat-other', label: 'อื่น ๆ' },
+  { id: "cat-income", label: "รายได้ประจำ" },
+  { id: "cat-food", label: "อาหารและเครื่องดื่ม" },
+  { id: "cat-housing", label: "ที่อยู่อาศัย" },
+  { id: "cat-transport", label: "การเดินทาง" },
+  { id: "cat-utility", label: "สาธารณูปโภค" },
+  { id: "cat-shopping", label: "ช้อปปิ้ง" },
+  { id: "cat-health", label: "สุขภาพ" },
+  { id: "cat-entertainment", label: "ความบันเทิง" },
+  { id: "cat-other", label: "อื่น ๆ" },
 ];
 
 const DEFAULT_RULES = [
-  { pattern: 'salary|เงินเดือน|payroll', categoryId: 'cat-income', priority: 100 },
-  { pattern: 'dividend|ปันผล|interest|ดอกเบี้ย', categoryId: 'cat-income', priority: 90 },
-  { pattern: 'grabpay wallet', categoryId: 'cat-food', priority: 86 },
-  { pattern: 'big c|บิ๊กซี|lotus|โลตัส|tops|foodland|makro|7-eleven|เซเว่น|cafe|amazon|starbucks', categoryId: 'cat-food', priority: 80 },
-  { pattern: 'น้ำดื่ม|กาแฟ|ชา|restaurant|food|delivery', categoryId: 'cat-food', priority: 78 },
-  { pattern: 'rent|ค่าเช่า|condo|คอนโด', categoryId: 'cat-housing', priority: 80 },
-  { pattern: 'grab|bolt|taxi|bts|mrt|รถไฟฟ้า|น้ำมัน|ptt|shell', categoryId: 'cat-transport', priority: 75 },
-  { pattern: 'water|ไฟฟ้า|ค่าไฟ|ค่าน้ำ|internet|โทรศัพท์|ประปา|dtac|ais|true money|ทรู มันนี|ทรูมันนี่|123 service|2c2p|ทูซีทูพี', categoryId: 'cat-utility', priority: 75 },
-  { pattern: 'shopee|shopeepay|lazada|central|mall|uniqlo|zara|kex|kerry|ไปรษณีย์|ปณท', categoryId: 'cat-shopping', priority: 70 },
-  { pattern: 'hospital|clinic|pharmacy|ร้านยา|โรงพยาบาล|คลินิก', categoryId: 'cat-health', priority: 70 },
-  { pattern: 'netflix|spotify|cinema|movie|major|concert|google powered|google play|alipay', categoryId: 'cat-entertainment', priority: 65 },
+  { pattern: "salary|เงินเดือน|payroll", categoryId: "cat-income", priority: 100 },
+  { pattern: "dividend|ปันผล|interest|ดอกเบี้ย", categoryId: "cat-income", priority: 90 },
+  { pattern: "grabpay wallet", categoryId: "cat-food", priority: 86 },
+  {
+    pattern: "big c|บิ๊กซี|lotus|โลตัส|tops|foodland|makro|7-eleven|เซเว่น|cafe|amazon|starbucks",
+    categoryId: "cat-food",
+    priority: 80,
+  },
+  { pattern: "น้ำดื่ม|กาแฟ|ชา|restaurant|food|delivery", categoryId: "cat-food", priority: 78 },
+  { pattern: "rent|ค่าเช่า|condo|คอนโด", categoryId: "cat-housing", priority: 80 },
+  {
+    pattern: "grab|bolt|taxi|bts|mrt|รถไฟฟ้า|น้ำมัน|ptt|shell",
+    categoryId: "cat-transport",
+    priority: 75,
+  },
+  {
+    pattern:
+      "water|ไฟฟ้า|ค่าไฟ|ค่าน้ำ|internet|โทรศัพท์|ประปา|dtac|ais|true money|ทรู มันนี|ทรูมันนี่|123 service|2c2p|ทูซีทูพี",
+    categoryId: "cat-utility",
+    priority: 75,
+  },
+  {
+    pattern: "shopee|shopeepay|lazada|central|mall|uniqlo|zara|kex|kerry|ไปรษณีย์|ปณท",
+    categoryId: "cat-shopping",
+    priority: 70,
+  },
+  {
+    pattern: "hospital|clinic|pharmacy|ร้านยา|โรงพยาบาล|คลินิก",
+    categoryId: "cat-health",
+    priority: 70,
+  },
+  {
+    pattern: "netflix|spotify|cinema|movie|major|concert|google powered|google play|alipay",
+    categoryId: "cat-entertainment",
+    priority: 65,
+  },
 ];
 
-const LEGACY_ACCOUNT_IDS = ['salary', 'spending', 'credit'];
+const LEGACY_ACCOUNT_IDS = ["salary", "spending", "credit"];
 
 let dbPromise = null;
+let initPromise = null;
 let memoryFallback = null; // used if IDB completely unavailable
-let fallbackMode = 'indexeddb'; // 'indexeddb' | 'localstorage' | 'memory'
+let fallbackMode = "indexeddb"; // 'indexeddb' | 'localstorage' | 'memory'
 
 function nowIso() {
   return new Date().toISOString();
 }
 
 function normalizeTitle(title) {
-  return String(title || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return String(title || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 function stableFingerprintHash(str) {
@@ -58,29 +87,27 @@ function stableFingerprintHash(str) {
     h4 = Math.imul(h4 ^ code, 668265263);
   }
 
-  return [h1, h2, h3, h4]
-    .map((part) => (part >>> 0).toString(16).padStart(8, '0'))
-    .join('');
+  return [h1, h2, h3, h4].map((part) => (part >>> 0).toString(16).padStart(8, "0")).join("");
 }
 
 function createFingerprint(accountId, transaction) {
   // Include rowNumber (or synthetic) so identical same-day rows in ONE import are kept as separate txns.
   // Re-importing same statement will produce identical fingerprints -> deduped.
-  const rowId = transaction.rowNumber != null ? `r${transaction.rowNumber}` : 'r0';
+  const rowId = transaction.rowNumber != null ? `r${transaction.rowNumber}` : "r0";
   const base = [
     accountId,
-    transaction.date || '',
+    transaction.date || "",
     normalizeTitle(transaction.title),
     transaction.amountSatang,
     rowId,
-  ].join('|');
+  ].join("|");
   return stableFingerprintHash(base);
 }
 
 function openIDB() {
   if (dbPromise) return dbPromise;
 
-  if (typeof indexedDB === 'undefined') {
+  if (typeof indexedDB === "undefined") {
     // No IDB at all -> localStorage or memory fallback
     return Promise.resolve(null);
   }
@@ -92,42 +119,52 @@ function openIDB() {
       const database = event.target.result;
 
       // accounts
-      if (!database.objectStoreNames.contains('accounts')) {
-        const accStore = database.createObjectStore('accounts', { keyPath: 'id' });
-        accStore.createIndex('created_at', 'created_at');
+      if (!database.objectStoreNames.contains("accounts")) {
+        const accStore = database.createObjectStore("accounts", { keyPath: "id" });
+        accStore.createIndex("created_at", "created_at");
       }
       // budgets
-      if (!database.objectStoreNames.contains('budgets')) {
-        const bStore = database.createObjectStore('budgets', { keyPath: 'id' });
-        bStore.createIndex('category_id', 'category_id', { unique: true });
+      if (!database.objectStoreNames.contains("budgets")) {
+        const bStore = database.createObjectStore("budgets", { keyPath: "id" });
+        bStore.createIndex("category_id", "category_id", { unique: true });
       }
       // goals
-      if (!database.objectStoreNames.contains('goals')) {
-        database.createObjectStore('goals', { keyPath: 'id' });
+      if (!database.objectStoreNames.contains("goals")) {
+        database.createObjectStore("goals", { keyPath: "id" });
+      }
+      if (!database.objectStoreNames.contains("profile")) {
+        database.createObjectStore("profile", { keyPath: "id" });
       }
       // categories
-      if (!database.objectStoreNames.contains('categories')) {
-        database.createObjectStore('categories', { keyPath: 'id' });
+      if (!database.objectStoreNames.contains("categories")) {
+        database.createObjectStore("categories", { keyPath: "id" });
       }
       // category_rules
-      if (!database.objectStoreNames.contains('category_rules')) {
-        const rStore = database.createObjectStore('category_rules', { keyPath: 'id', autoIncrement: true });
-        rStore.createIndex('priority', 'priority');
+      if (!database.objectStoreNames.contains("category_rules")) {
+        const rStore = database.createObjectStore("category_rules", {
+          keyPath: "id",
+          autoIncrement: true,
+        });
+        rStore.createIndex("priority", "priority");
       }
       // transactions
-      if (!database.objectStoreNames.contains('transactions')) {
-        const tStore = database.createObjectStore('transactions', { keyPath: 'id' });
-        tStore.createIndex('fingerprint', 'fingerprint', { unique: false });
-        tStore.createIndex('account_id', 'account_id');
-        tStore.createIndex('date', 'date');
+      if (!database.objectStoreNames.contains("transactions")) {
+        const tStore = database.createObjectStore("transactions", { keyPath: "id" });
+        tStore.createIndex("fingerprint", "fingerprint", { unique: false });
+        tStore.createIndex("account_id", "account_id");
+        tStore.createIndex("date", "date");
       }
       // import_batches (light history)
-      if (!database.objectStoreNames.contains('import_batches')) {
-        database.createObjectStore('import_batches', { keyPath: 'id' });
+      if (!database.objectStoreNames.contains("import_batches")) {
+        database.createObjectStore("import_batches", { keyPath: "id" });
       }
     };
 
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const database = req.result;
+      database.onversionchange = () => database.close();
+      resolve(database);
+    };
     req.onerror = () => {
       dbPromise = null;
       reject(req.error);
@@ -143,15 +180,15 @@ function openIDB() {
 async function getDB() {
   const database = await openIDB();
   if (database) {
-    fallbackMode = 'indexeddb';
+    fallbackMode = "indexeddb";
     return database;
   }
   // Fallback path
-  if (typeof localStorage !== 'undefined') {
-    fallbackMode = 'localstorage';
+  if (typeof localStorage !== "undefined") {
+    fallbackMode = "localstorage";
     return null; // signal to use LS helpers
   }
-  fallbackMode = 'memory';
+  fallbackMode = "memory";
   if (!memoryFallback) memoryFallback = createMemoryStore();
   return null;
 }
@@ -161,16 +198,28 @@ function createMemoryStore() {
     accounts: [],
     budgets: [],
     goals: [],
-    profile: { id: 1, display_name: '', avatar_initial: '', email: '', created_at: nowIso(), updated_at: nowIso() },
+    profile: {
+      id: 1,
+      display_name: "",
+      avatar_initial: "",
+      email: "",
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    },
     categories: [...DEFAULT_CATEGORIES],
-    category_rules: DEFAULT_RULES.map((r, i) => ({ id: i + 1, pattern: r.pattern, category_id: r.categoryId, priority: r.priority })),
+    category_rules: DEFAULT_RULES.map((r, i) => ({
+      id: i + 1,
+      pattern: r.pattern,
+      category_id: r.categoryId,
+      priority: r.priority,
+    })),
     transactions: [],
     import_batches: [],
   };
 }
 
 // --- LocalStorage fallback (versioned, centralized) ---
-const LS_KEY = 'findash_local_v1';
+const LS_KEY = "findash_local_v1";
 
 function readLS() {
   try {
@@ -199,9 +248,25 @@ function ensureLSShape(data) {
   data.accounts = data.accounts || [];
   data.budgets = data.budgets || [];
   data.goals = data.goals || [];
-  data.profile = data.profile || { id: 1, display_name: '', avatar_initial: '', email: '', created_at: nowIso(), updated_at: nowIso() };
-  data.categories = data.categories && data.categories.length ? data.categories : [...DEFAULT_CATEGORIES];
-  data.category_rules = data.category_rules && data.category_rules.length ? data.category_rules : DEFAULT_RULES.map((r, i) => ({ id: i + 1, pattern: r.pattern, category_id: r.categoryId, priority: r.priority }));
+  data.profile = data.profile || {
+    id: 1,
+    display_name: "",
+    avatar_initial: "",
+    email: "",
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  data.categories =
+    data.categories && data.categories.length ? data.categories : [...DEFAULT_CATEGORIES];
+  data.category_rules =
+    data.category_rules && data.category_rules.length
+      ? data.category_rules
+      : DEFAULT_RULES.map((r, i) => ({
+          id: i + 1,
+          pattern: r.pattern,
+          category_id: r.categoryId,
+          priority: r.priority,
+        }));
   data.transactions = data.transactions || [];
   data.import_batches = data.import_batches || [];
   return data;
@@ -211,7 +276,7 @@ async function withIDBStore(storeName, mode, fn) {
   const database = await getDB();
   if (!database) {
     // LS or memory path
-    if (fallbackMode === 'localstorage') {
+    if (fallbackMode === "localstorage") {
       let data = readLS() || createMemoryStore();
       data = ensureLSShape(data);
       const result = fn({ useLS: true, data, storeName });
@@ -244,48 +309,64 @@ async function withIDBStore(storeName, mode, fn) {
 
 // Seed defaults (idempotent)
 async function seedDefaults() {
-  // categories
-  for (const cat of DEFAULT_CATEGORIES) {
-    await withIDBStore('categories', 'readwrite', ({ store, useLS, data }) => {
+  // Seed each collection in one transaction. This avoids repeatedly parsing and
+  // serializing the entire localStorage fallback on startup.
+  await withIDBStore("categories", "readwrite", ({ store, useLS, data }) => {
+    if (useLS || data) {
+      const existingIds = new Set((data.categories || []).map((category) => category.id));
+      for (const category of DEFAULT_CATEGORIES) {
+        if (!existingIds.has(category.id)) data.categories.push({ ...category });
+      }
+      return { _write: true, data };
+    }
+    if (!store) return;
+    for (const category of DEFAULT_CATEGORIES) store.put({ ...category });
+  });
+
+  const existingRules = await withIDBStore(
+    "category_rules",
+    "readonly",
+    async ({ store, useLS, data }) => {
       if (useLS || data) {
-        const exists = (data.categories || []).some((c) => c.id === cat.id);
-        if (!exists) data.categories.push({ ...cat });
+        return data.category_rules || [];
+      }
+      if (!store) return [];
+      return new Promise((res) => {
+        const req = store.getAll();
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => res([]);
+      });
+    }
+  );
+
+  const existingPatternSet = new Set(
+    (existingRules || []).map((rule) => `${rule.pattern}|${rule.category_id || rule.categoryId}`)
+  );
+
+  const missingRules = DEFAULT_RULES.flatMap((rule, index) => {
+    const key = `${rule.pattern}|${rule.categoryId}`;
+    return existingPatternSet.has(key) ? [] : [{ ...rule, id: index + 1 }];
+  });
+
+  if (missingRules.length > 0) {
+    await withIDBStore("category_rules", "readwrite", ({ store, useLS, data }) => {
+      if (useLS || data) {
+        data.category_rules = data.category_rules || [];
+        data.category_rules.push(
+          ...missingRules.map((rule) => ({
+            id: rule.id,
+            pattern: rule.pattern,
+            category_id: rule.categoryId,
+            priority: rule.priority,
+          }))
+        );
         return { _write: true, data };
       }
       if (!store) return;
-      store.put({ ...cat });
-    });
-  }
-
-  const existingRules = await withIDBStore('category_rules', 'readonly', async ({ store, useLS, data }) => {
-    if (useLS || data) {
-      return data.category_rules || [];
-    }
-    if (!store) return [];
-    return new Promise((res) => {
-      const req = store.getAll();
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => res([]);
-    });
-  });
-
-  const existingPatternSet = new Set(
-    (existingRules || []).map((rule) => `${rule.pattern}|${rule.category_id || rule.categoryId}`),
-  );
-
-  for (const [idx, rule] of DEFAULT_RULES.entries()) {
-    const key = `${rule.pattern}|${rule.categoryId}`;
-    if (!existingPatternSet.has(key)) {
-      await withIDBStore('category_rules', 'readwrite', ({ store, useLS, data }) => {
-        if (useLS || data) {
-          data.category_rules = data.category_rules || [];
-          data.category_rules.push({ id: idx + 1, pattern: rule.pattern, category_id: rule.categoryId, priority: rule.priority });
-          return { _write: true, data };
-        }
-        if (!store) return;
+      for (const rule of missingRules) {
         store.add({ pattern: rule.pattern, category_id: rule.categoryId, priority: rule.priority });
-      });
-    }
+      }
+    });
   }
 
   // cleanup legacy mock accounts (no-op if none)
@@ -294,11 +375,11 @@ async function seedDefaults() {
 
 async function cleanupLegacyMockAccounts() {
   for (const id of LEGACY_ACCOUNT_IDS) {
-    const hasTx = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+    const hasTx = await withIDBStore("transactions", "readonly", ({ store, useLS, data }) => {
       if (useLS || data) return (data.transactions || []).some((t) => t.account_id === id);
       if (!store) return false;
       return new Promise((res) => {
-        const idx = store.index('account_id');
+        const idx = store.index("account_id");
         const req = idx.count(id);
         req.onsuccess = () => res(req.result > 0);
         req.onerror = () => res(false);
@@ -306,7 +387,7 @@ async function cleanupLegacyMockAccounts() {
     });
     if (hasTx) continue;
 
-    await withIDBStore('accounts', 'readwrite', ({ store, useLS, data }) => {
+    await withIDBStore("accounts", "readwrite", ({ store, useLS, data }) => {
       if (useLS || data) {
         data.accounts = (data.accounts || []).filter((a) => a.id !== id);
         return { _write: true, data };
@@ -318,24 +399,36 @@ async function cleanupLegacyMockAccounts() {
 }
 
 // --- Public API ---
-async function init() {
+async function initializeStore() {
   await getDB();
   await seedDefaults();
   return { mode: fallbackMode };
 }
 
+function init() {
+  if (!initPromise) {
+    initPromise = initializeStore().catch((error) => {
+      initPromise = null;
+      throw error;
+    });
+  }
+  return initPromise;
+}
+
 async function getAccounts() {
   await init();
-  return withIDBStore('accounts', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("accounts", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return [...(data.accounts || [])].sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+      return [...(data.accounts || [])].sort((a, b) =>
+        (a.created_at || "").localeCompare(b.created_at || "")
+      );
     }
     if (!store) return [];
     return new Promise((res) => {
       const req = store.getAll();
       req.onsuccess = () => {
         const list = req.result || [];
-        list.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+        list.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
         res(list);
       };
       req.onerror = () => res([]);
@@ -344,11 +437,11 @@ async function getAccounts() {
 }
 
 function sanitizeAccountPayload(payload = {}) {
-  const name = String(payload.name || '').trim();
-  if (!name) throw new Error('กรุณาระบุชื่อบัญชี');
-  const type = ['bank', 'credit', 'cash'].includes(payload.type) ? payload.type : 'bank';
+  const name = String(payload.name || "").trim();
+  if (!name) throw new Error("กรุณาระบุชื่อบัญชี");
+  const type = ["bank", "credit", "cash"].includes(payload.type) ? payload.type : "bank";
   const currentBalance = Number(payload.current_balance);
-  const institution = String(payload.institution || '').trim();
+  const institution = String(payload.institution || "").trim();
   return {
     name,
     institution,
@@ -373,7 +466,7 @@ async function createAccount(payload) {
     updated_at: timestamp,
   };
 
-  await withIDBStore('accounts', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("accounts", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.accounts = data.accounts || [];
       data.accounts.push(record);
@@ -389,7 +482,7 @@ async function createAccount(payload) {
 async function updateAccount(id, payload) {
   await init();
   const account = sanitizeAccountPayload(payload);
-  const existing = await withIDBStore('accounts', 'readonly', ({ store, useLS, data }) => {
+  const existing = await withIDBStore("accounts", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.accounts || []).find((a) => a.id === id);
     if (!store) return null;
     return new Promise((res) => {
@@ -398,7 +491,7 @@ async function updateAccount(id, payload) {
       req.onerror = () => res(null);
     });
   });
-  if (!existing) throw new Error('ไม่พบบัญชีที่ต้องการแก้ไข');
+  if (!existing) throw new Error("ไม่พบบัญชีที่ต้องการแก้ไข");
 
   const updated = {
     ...existing,
@@ -409,7 +502,7 @@ async function updateAccount(id, payload) {
     updated_at: nowIso(),
   };
 
-  await withIDBStore('accounts', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("accounts", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.accounts = (data.accounts || []).map((a) => (a.id === id ? updated : a));
       return { _write: true, data };
@@ -422,17 +515,17 @@ async function updateAccount(id, payload) {
 
 async function deleteAccount(id) {
   await init();
-  const txCount = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+  const txCount = await withIDBStore("transactions", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.transactions || []).filter((t) => t.account_id === id).length;
     if (!store) return 0;
     return new Promise((res) => {
-      const idx = store.index('account_id');
+      const idx = store.index("account_id");
       const req = idx.count(id);
       req.onsuccess = () => res(req.result);
       req.onerror = () => res(0);
     });
   });
-  const batchCount = await withIDBStore('import_batches', 'readonly', ({ store, useLS, data }) => {
+  const batchCount = await withIDBStore("import_batches", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.import_batches || []).filter((b) => b.account_id === id).length;
     if (!store) return 0;
     return new Promise((res) => {
@@ -443,10 +536,10 @@ async function deleteAccount(id) {
   });
 
   if (txCount > 0 || batchCount > 0) {
-    throw new Error('ลบบัญชีนี้ไม่ได้ เพราะมีธุรกรรมหรือประวัติการนำเข้าอยู่');
+    throw new Error("ลบบัญชีนี้ไม่ได้ เพราะมีธุรกรรมหรือประวัติการนำเข้าอยู่");
   }
 
-  await withIDBStore('accounts', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("accounts", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.accounts = (data.accounts || []).filter((a) => a.id !== id);
       return { _write: true, data };
@@ -459,11 +552,12 @@ async function deleteAccount(id) {
 
 async function getBudgets() {
   await init();
-  return withIDBStore('budgets', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("budgets", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
       const cats = new Map((data.categories || []).map((c) => [c.id, c.label]));
-      return (data.budgets || []).map((b) => ({ ...b, category_label: cats.get(b.category_id) || b.category_id }))
-        .sort((a, b) => (a.category_label || '').localeCompare(b.category_label || ''));
+      return (data.budgets || [])
+        .map((b) => ({ ...b, category_label: cats.get(b.category_id) || b.category_id }))
+        .sort((a, b) => (a.category_label || "").localeCompare(b.category_label || ""));
     }
     if (!store) return [];
     return new Promise((res) => {
@@ -471,7 +565,7 @@ async function getBudgets() {
       req.onsuccess = () => {
         const list = req.result || [];
         // join category label (lightweight)
-        withIDBStore('categories', 'readonly', ({ store: catStore }) => {
+        withIDBStore("categories", "readonly", ({ store: catStore }) => {
           if (!catStore) {
             res(list);
             return;
@@ -479,8 +573,11 @@ async function getBudgets() {
           const catReq = catStore.getAll();
           catReq.onsuccess = () => {
             const cmap = new Map((catReq.result || []).map((c) => [c.id, c.label]));
-            res(list.map((b) => ({ ...b, category_label: cmap.get(b.category_id) || b.category_id }))
-              .sort((a, b) => (a.category_label || '').localeCompare(b.category_label || '')));
+            res(
+              list
+                .map((b) => ({ ...b, category_label: cmap.get(b.category_id) || b.category_id }))
+                .sort((a, b) => (a.category_label || "").localeCompare(b.category_label || ""))
+            );
           };
           catReq.onerror = () => res(list);
         });
@@ -491,7 +588,7 @@ async function getBudgets() {
 }
 
 function sanitizeBudgetPayload(payload = {}) {
-  const categoryId = String(payload.category_id || '').trim();
+  const categoryId = String(payload.category_id || "").trim();
   const monthlyLimit = Number(payload.monthly_limit);
   return {
     category_id: categoryId,
@@ -503,23 +600,24 @@ async function createBudget(payload) {
   await init();
   const budget = sanitizeBudgetPayload(payload);
   // check duplicate category
-  const existing = await withIDBStore('budgets', 'readonly', ({ store, useLS, data }) => {
-    if (useLS || data) return (data.budgets || []).find((b) => b.category_id === budget.category_id);
+  const existing = await withIDBStore("budgets", "readonly", ({ store, useLS, data }) => {
+    if (useLS || data)
+      return (data.budgets || []).find((b) => b.category_id === budget.category_id);
     if (!store) return null;
     return new Promise((res) => {
-      const idx = store.index('category_id');
+      const idx = store.index("category_id");
       const req = idx.get(budget.category_id);
       req.onsuccess = () => res(req.result);
       req.onerror = () => res(null);
     });
   });
-  if (existing) throw new Error('หมวดนี้มีงบประมาณแล้ว ให้แก้ไขรายการเดิมแทน');
+  if (existing) throw new Error("หมวดนี้มีงบประมาณแล้ว ให้แก้ไขรายการเดิมแทน");
 
   const id = `budget-${cryptoRandomId()}`;
   const timestamp = nowIso();
   const record = { id, ...budget, created_at: timestamp, updated_at: timestamp };
 
-  await withIDBStore('budgets', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("budgets", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.budgets = data.budgets || [];
       data.budgets.push(record);
@@ -528,34 +626,44 @@ async function createBudget(payload) {
     if (!store) return;
     store.add(record);
   });
-  return { ...record, category_label: (await getCategoryLabel(budget.category_id)) };
+  return { ...record, category_label: await getCategoryLabel(budget.category_id) };
 }
 
 async function updateBudget(id, payload) {
   await init();
   const budget = sanitizeBudgetPayload(payload);
-  const existing = await withIDBStore('budgets', 'readonly', ({ store, useLS, data }) => {
+  const existing = await withIDBStore("budgets", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.budgets || []).find((b) => b.id === id);
     if (!store) return null;
-    return new Promise((res) => { const r = store.get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+    return new Promise((res) => {
+      const r = store.get(id);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    });
   });
-  if (!existing) throw new Error('ไม่พบงบประมาณที่ต้องการแก้ไข');
+  if (!existing) throw new Error("ไม่พบงบประมาณที่ต้องการแก้ไข");
 
   // duplicate check excluding self
-  const dup = await withIDBStore('budgets', 'readonly', ({ store, useLS, data }) => {
-    if (useLS || data) return (data.budgets || []).find((b) => b.category_id === budget.category_id && b.id !== id);
+  const dup = await withIDBStore("budgets", "readonly", ({ store, useLS, data }) => {
+    if (useLS || data)
+      return (data.budgets || []).find((b) => b.category_id === budget.category_id && b.id !== id);
     if (!store) return null;
     return new Promise((res) => {
-      const idx = store.index('category_id');
+      const idx = store.index("category_id");
       const req = idx.get(budget.category_id);
       req.onsuccess = () => res(req.result && req.result.id !== id ? req.result : null);
       req.onerror = () => res(null);
     });
   });
-  if (dup) throw new Error('หมวดนี้มีงบประมาณแล้ว ให้เลือกหมวดอื่น');
+  if (dup) throw new Error("หมวดนี้มีงบประมาณแล้ว ให้เลือกหมวดอื่น");
 
-  const updated = { ...existing, category_id: budget.category_id, monthly_limit: budget.monthly_limit, updated_at: nowIso() };
-  await withIDBStore('budgets', 'readwrite', ({ store, useLS, data }) => {
+  const updated = {
+    ...existing,
+    category_id: budget.category_id,
+    monthly_limit: budget.monthly_limit,
+    updated_at: nowIso(),
+  };
+  await withIDBStore("budgets", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.budgets = (data.budgets || []).map((b) => (b.id === id ? updated : b));
       return { _write: true, data };
@@ -563,12 +671,12 @@ async function updateBudget(id, payload) {
     if (!store) return;
     store.put(updated);
   });
-  return { ...updated, category_label: (await getCategoryLabel(updated.category_id)) };
+  return { ...updated, category_label: await getCategoryLabel(updated.category_id) };
 }
 
 async function deleteBudget(id) {
   await init();
-  await withIDBStore('budgets', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("budgets", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.budgets = (data.budgets || []).filter((b) => b.id !== id);
       return { _write: true, data };
@@ -581,22 +689,27 @@ async function deleteBudget(id) {
 
 async function getGoals() {
   await init();
-  return withIDBStore('goals', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("goals", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return [...(data.goals || [])].sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+      return [...(data.goals || [])].sort((a, b) =>
+        (a.created_at || "").localeCompare(b.created_at || "")
+      );
     }
     if (!store) return [];
     return new Promise((res) => {
       const req = store.getAll();
-      req.onsuccess = () => res((req.result || []).sort((a, b) => (a.created_at || '').localeCompare(b.created_at || '')));
+      req.onsuccess = () =>
+        res(
+          (req.result || []).sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""))
+        );
       req.onerror = () => res([]);
     });
   });
 }
 
 function sanitizeGoalPayload(payload = {}) {
-  const label = String(payload.label || '').trim();
-  if (!label) throw new Error('กรุณาระบุชื่อเป้าหมาย');
+  const label = String(payload.label || "").trim();
+  if (!label) throw new Error("กรุณาระบุชื่อเป้าหมาย");
   const target = Number(payload.target_amount);
   const saved = Number(payload.saved_amount);
   return {
@@ -613,7 +726,7 @@ async function createGoal(payload) {
   const id = `goal-${cryptoRandomId()}`;
   const record = { id, ...goal, created_at: timestamp, updated_at: timestamp };
 
-  await withIDBStore('goals', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("goals", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.goals = data.goals || [];
       data.goals.push(record);
@@ -628,15 +741,19 @@ async function createGoal(payload) {
 async function updateGoal(id, payload) {
   await init();
   const goal = sanitizeGoalPayload(payload);
-  const existing = await withIDBStore('goals', 'readonly', ({ store, useLS, data }) => {
+  const existing = await withIDBStore("goals", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.goals || []).find((g) => g.id === id);
     if (!store) return null;
-    return new Promise((res) => { const r = store.get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+    return new Promise((res) => {
+      const r = store.get(id);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    });
   });
-  if (!existing) throw new Error('ไม่พบเป้าหมายที่ต้องการแก้ไข');
+  if (!existing) throw new Error("ไม่พบเป้าหมายที่ต้องการแก้ไข");
 
   const updated = { ...existing, ...goal, updated_at: nowIso() };
-  await withIDBStore('goals', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("goals", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.goals = (data.goals || []).map((g) => (g.id === id ? updated : g));
       return { _write: true, data };
@@ -649,7 +766,7 @@ async function updateGoal(id, payload) {
 
 async function deleteGoal(id) {
   await init();
-  await withIDBStore('goals', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("goals", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.goals = (data.goals || []).filter((g) => g.id !== id);
       return { _write: true, data };
@@ -662,24 +779,45 @@ async function deleteGoal(id) {
 
 async function getUserProfile() {
   await init();
-  return withIDBStore('profile', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("profile", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return data.profile || { id: 1, display_name: '', avatar_initial: '', email: '', created_at: nowIso(), updated_at: nowIso() };
+      return (
+        data.profile || {
+          id: 1,
+          display_name: "",
+          avatar_initial: "",
+          email: "",
+          created_at: nowIso(),
+          updated_at: nowIso(),
+        }
+      );
     }
-    if (!store) return { id: 1, display_name: '', avatar_initial: '', email: '' };
+    if (!store) return { id: 1, display_name: "", avatar_initial: "", email: "" };
     return new Promise((res) => {
       const req = store.get(1);
-      req.onsuccess = () => res(req.result || { id: 1, display_name: '', avatar_initial: '', email: '', created_at: nowIso(), updated_at: nowIso() });
-      req.onerror = () => res({ id: 1, display_name: '', avatar_initial: '', email: '' });
+      req.onsuccess = () =>
+        res(
+          req.result || {
+            id: 1,
+            display_name: "",
+            avatar_initial: "",
+            email: "",
+            created_at: nowIso(),
+            updated_at: nowIso(),
+          }
+        );
+      req.onerror = () => res({ id: 1, display_name: "", avatar_initial: "", email: "" });
     });
   });
 }
 
 async function updateUserProfile(payload = {}) {
   await init();
-  const displayName = String(payload.display_name || '').trim();
-  const avatarInitial = String(payload.avatar_initial || displayName.slice(0, 1) || '').trim().slice(0, 2);
-  const email = String(payload.email || '').trim();
+  const displayName = String(payload.display_name || "").trim();
+  const avatarInitial = String(payload.avatar_initial || displayName.slice(0, 1) || "")
+    .trim()
+    .slice(0, 2);
+  const email = String(payload.email || "").trim();
   const timestamp = nowIso();
 
   const updated = {
@@ -691,7 +829,7 @@ async function updateUserProfile(payload = {}) {
     updated_at: timestamp,
   };
 
-  await withIDBStore('profile', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("profile", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.profile = updated;
       return { _write: true, data };
@@ -704,10 +842,12 @@ async function updateUserProfile(payload = {}) {
 
 async function getTransactions() {
   await init();
-  const txs = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+  const txs = await withIDBStore("transactions", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return [...(data.transactions || [])].sort((a, b) =>
-        (b.date || '').localeCompare(a.date || '') || (b.imported_at || '').localeCompare(a.imported_at || '')
+      return [...(data.transactions || [])].sort(
+        (a, b) =>
+          (b.date || "").localeCompare(a.date || "") ||
+          (b.imported_at || "").localeCompare(a.imported_at || "")
       );
     }
     if (!store) return [];
@@ -715,8 +855,10 @@ async function getTransactions() {
       const req = store.getAll();
       req.onsuccess = () => {
         const list = req.result || [];
-        list.sort((a, b) =>
-          (b.date || '').localeCompare(a.date || '') || (b.imported_at || '').localeCompare(a.imported_at || '')
+        list.sort(
+          (a, b) =>
+            (b.date || "").localeCompare(a.date || "") ||
+            (b.imported_at || "").localeCompare(a.imported_at || "")
         );
         res(list);
       };
@@ -728,12 +870,12 @@ async function getTransactions() {
   const catMap = await getCategoryMap();
   return txs.map((t) => ({
     ...t,
-    category_label: catMap.get(t.category_id) || t.category_label || 'อื่น ๆ',
+    category_label: catMap.get(t.category_id) || t.category_label || "อื่น ๆ",
   }));
 }
 
 async function getCategoryMap() {
-  return withIDBStore('categories', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("categories", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
       return new Map((data.categories || []).map((c) => [c.id, c.label]));
     }
@@ -748,26 +890,28 @@ async function getCategoryMap() {
 
 async function getCategoryLabel(id) {
   const map = await getCategoryMap();
-  return map.get(id) || 'อื่น ๆ';
+  return map.get(id) || "อื่น ๆ";
 }
 
 function categorize(transaction, rules) {
-  if (transaction.amountSatang > 0) return 'cat-income';
+  if (transaction.amountSatang > 0) return "cat-income";
   const title = normalizeTitle(transaction.title);
   const match = (rules || []).find((rule) => {
     try {
-      return new RegExp(rule.pattern, 'i').test(title);
+      return new RegExp(rule.pattern, "i").test(title);
     } catch {
       return false;
     }
   });
-  return match?.category_id || match?.categoryId || 'cat-other';
+  return match?.category_id || match?.categoryId || "cat-other";
 }
 
 async function getRules() {
-  return withIDBStore('category_rules', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("category_rules", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return (data.category_rules || []).sort((a, b) => (b.priority || 0) - (a.priority || 0) || (a.id || 0) - (b.id || 0));
+      return (data.category_rules || []).sort(
+        (a, b) => (b.priority || 0) - (a.priority || 0) || (a.id || 0) - (b.id || 0)
+      );
     }
     if (!store) return [];
     return new Promise((res) => {
@@ -785,16 +929,18 @@ async function getRules() {
 // --- Category & Rule management (public CRUD, safe for existing data) ---
 async function getCategories() {
   await init();
-  return withIDBStore('categories', 'readonly', ({ store, useLS, data }) => {
+  return withIDBStore("categories", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return [...(data.categories || [])].sort((a, b) => (a.label || '').localeCompare(b.label || '', 'th-TH'));
+      return [...(data.categories || [])].sort((a, b) =>
+        (a.label || "").localeCompare(b.label || "", "th-TH")
+      );
     }
     if (!store) return [];
     return new Promise((res) => {
       const req = store.getAll();
       req.onsuccess = () => {
         const list = req.result || [];
-        list.sort((a, b) => (a.label || '').localeCompare(b.label || '', 'th-TH'));
+        list.sort((a, b) => (a.label || "").localeCompare(b.label || "", "th-TH"));
         res(list);
       };
       req.onerror = () => res([]);
@@ -803,8 +949,8 @@ async function getCategories() {
 }
 
 function sanitizeCategoryPayload(payload = {}) {
-  const label = String(payload.label || '').trim();
-  if (!label) throw new Error('กรุณาระบุชื่อหมวดหมู่');
+  const label = String(payload.label || "").trim();
+  if (!label) throw new Error("กรุณาระบุชื่อหมวดหมู่");
   return { label };
 }
 
@@ -812,23 +958,30 @@ async function createCategory(payload = {}) {
   await init();
   const cat = sanitizeCategoryPayload(payload);
   // duplicate label check (case-insensitive for Thai friendliness)
-  const existing = await withIDBStore('categories', 'readonly', ({ store, useLS, data }) => {
+  const existing = await withIDBStore("categories", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) {
-      return (data.categories || []).find((c) => (c.label || '').toLowerCase() === cat.label.toLowerCase());
+      return (data.categories || []).find(
+        (c) => (c.label || "").toLowerCase() === cat.label.toLowerCase()
+      );
     }
     if (!store) return null;
     return new Promise((res) => {
       const req = store.getAll();
-      req.onsuccess = () => res((req.result || []).find((c) => (c.label || '').toLowerCase() === cat.label.toLowerCase()) || null);
+      req.onsuccess = () =>
+        res(
+          (req.result || []).find(
+            (c) => (c.label || "").toLowerCase() === cat.label.toLowerCase()
+          ) || null
+        );
       req.onerror = () => res(null);
     });
   });
-  if (existing) throw new Error('มีหมวดหมู่นี้แล้ว');
+  if (existing) throw new Error("มีหมวดหมู่นี้แล้ว");
 
   const id = `cat-user-${cryptoRandomId().slice(0, 10)}`;
   const record = { id, label: cat.label };
 
-  await withIDBStore('categories', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("categories", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.categories = data.categories || [];
       data.categories.push(record);
@@ -843,15 +996,19 @@ async function createCategory(payload = {}) {
 async function updateCategory(id, payload = {}) {
   await init();
   const cat = sanitizeCategoryPayload(payload);
-  const existing = await withIDBStore('categories', 'readonly', ({ store, useLS, data }) => {
+  const existing = await withIDBStore("categories", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.categories || []).find((c) => c.id === id);
     if (!store) return null;
-    return new Promise((res) => { const r = store.get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+    return new Promise((res) => {
+      const r = store.get(id);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    });
   });
-  if (!existing) throw new Error('ไม่พบหมวดหมู่ที่ต้องการแก้ไข');
+  if (!existing) throw new Error("ไม่พบหมวดหมู่ที่ต้องการแก้ไข");
 
   const updated = { ...existing, label: cat.label };
-  await withIDBStore('categories', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("categories", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.categories = (data.categories || []).map((c) => (c.id === id ? updated : c));
       return { _write: true, data };
@@ -865,7 +1022,7 @@ async function updateCategory(id, payload = {}) {
 async function deleteCategory(id) {
   await init();
   // Safety: block if referenced by transactions or budgets (protect user data)
-  const txCount = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+  const txCount = await withIDBStore("transactions", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.transactions || []).filter((t) => t.category_id === id).length;
     if (!store) return 0;
     return new Promise((res) => {
@@ -875,7 +1032,7 @@ async function deleteCategory(id) {
       req.onerror = () => res(0);
     });
   });
-  const budgetCount = await withIDBStore('budgets', 'readonly', ({ store, useLS, data }) => {
+  const budgetCount = await withIDBStore("budgets", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.budgets || []).filter((b) => b.category_id === id).length;
     if (!store) return 0;
     return new Promise((res) => {
@@ -885,10 +1042,10 @@ async function deleteCategory(id) {
     });
   });
   if (txCount > 0 || budgetCount > 0) {
-    throw new Error('ลบหมวดหมู่ไม่ได้ เนื่องจากมีธุรกรรมหรืองบประมาณใช้หมวดนี้อยู่');
+    throw new Error("ลบหมวดหมู่ไม่ได้ เนื่องจากมีธุรกรรมหรืองบประมาณใช้หมวดนี้อยู่");
   }
 
-  await withIDBStore('categories', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("categories", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.categories = (data.categories || []).filter((c) => c.id !== id);
       return { _write: true, data };
@@ -905,15 +1062,17 @@ async function getCategoryRules() {
 
 async function createCategoryRule(payload = {}) {
   await init();
-  const pattern = String(payload.pattern || '').trim();
-  if (!pattern) throw new Error('กรุณาระบุรูปแบบข้อความ (pattern) สำหรับกฎ');
-  const categoryId = String(payload.category_id || payload.categoryId || '').trim();
-  if (!categoryId) throw new Error('กรุณาเลือกหมวดหมู่สำหรับกฎ');
-  const priority = Number.isFinite(payload.priority) ? Math.max(0, Math.min(1000, Math.round(payload.priority))) : 50;
+  const pattern = String(payload.pattern || "").trim();
+  if (!pattern) throw new Error("กรุณาระบุรูปแบบข้อความ (pattern) สำหรับกฎ");
+  const categoryId = String(payload.category_id || payload.categoryId || "").trim();
+  if (!categoryId) throw new Error("กรุณาเลือกหมวดหมู่สำหรับกฎ");
+  const priority = Number.isFinite(payload.priority)
+    ? Math.max(0, Math.min(1000, Math.round(payload.priority)))
+    : 50;
 
   // Verify category exists
   const cats = await getCategories();
-  if (!cats.some((c) => c.id === categoryId)) throw new Error('ไม่พบหมวดหมู่ที่เลือก');
+  if (!cats.some((c) => c.id === categoryId)) throw new Error("ไม่พบหมวดหมู่ที่เลือก");
 
   const id = `rule-${cryptoRandomId()}`;
   const record = {
@@ -924,7 +1083,7 @@ async function createCategoryRule(payload = {}) {
     created_at: nowIso(),
   };
 
-  await withIDBStore('category_rules', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("category_rules", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.category_rules = data.category_rules || [];
       data.category_rules.push(record);
@@ -939,23 +1098,33 @@ async function createCategoryRule(payload = {}) {
 
 async function updateCategoryRule(id, payload = {}) {
   await init();
-  const existing = await withIDBStore('category_rules', 'readonly', ({ store, useLS, data }) => {
+  const existing = await withIDBStore("category_rules", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.category_rules || []).find((r) => r.id === id);
     if (!store) return null;
-    return new Promise((res) => { const r = store.get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+    return new Promise((res) => {
+      const r = store.get(id);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    });
   });
-  if (!existing) throw new Error('ไม่พบกฎที่ต้องการแก้ไข');
+  if (!existing) throw new Error("ไม่พบกฎที่ต้องการแก้ไข");
 
   const pattern = payload.pattern != null ? String(payload.pattern).trim() : existing.pattern;
-  const categoryId = payload.category_id || payload.categoryId ? String(payload.category_id || payload.categoryId).trim() : existing.category_id;
-  const priority = payload.priority != null && Number.isFinite(payload.priority) ? Math.max(0, Math.min(1000, Math.round(payload.priority))) : existing.priority;
+  const categoryId =
+    payload.category_id || payload.categoryId
+      ? String(payload.category_id || payload.categoryId).trim()
+      : existing.category_id;
+  const priority =
+    payload.priority != null && Number.isFinite(payload.priority)
+      ? Math.max(0, Math.min(1000, Math.round(payload.priority)))
+      : existing.priority;
 
-  if (!pattern) throw new Error('รูปแบบข้อความ (pattern) ต้องไม่ว่าง');
+  if (!pattern) throw new Error("รูปแบบข้อความ (pattern) ต้องไม่ว่าง");
   const cats = await getCategories();
-  if (!cats.some((c) => c.id === categoryId)) throw new Error('ไม่พบหมวดหมู่ที่เลือก');
+  if (!cats.some((c) => c.id === categoryId)) throw new Error("ไม่พบหมวดหมู่ที่เลือก");
 
   const updated = { ...existing, pattern, category_id: categoryId, priority, updated_at: nowIso() };
-  await withIDBStore('category_rules', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("category_rules", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.category_rules = (data.category_rules || []).map((r) => (r.id === id ? updated : r));
       return { _write: true, data };
@@ -968,7 +1137,7 @@ async function updateCategoryRule(id, payload = {}) {
 
 async function deleteCategoryRule(id) {
   await init();
-  await withIDBStore('category_rules', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("category_rules", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       data.category_rules = (data.category_rules || []).filter((r) => r.id !== id);
       return { _write: true, data };
@@ -981,16 +1150,16 @@ async function deleteCategoryRule(id) {
 
 async function updateTransactionCategory(txId, categoryId) {
   await init();
-  if (!txId || !categoryId) throw new Error('ข้อมูลไม่ครบถ้วน');
+  if (!txId || !categoryId) throw new Error("ข้อมูลไม่ครบถ้วน");
   const label = await getCategoryLabel(categoryId);
 
-  await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("transactions", "readwrite", ({ store, useLS, data }) => {
     if (useLS || data) {
       const tx = (data.transactions || []).find((t) => t.id === txId);
       if (tx) {
         tx.category_id = categoryId;
         tx.category_label = label;
-        tx.category_source = 'manual';
+        tx.category_source = "manual";
         tx.updated_at = nowIso();
       }
       return { _write: true, data };
@@ -1002,7 +1171,7 @@ async function updateTransactionCategory(txId, categoryId) {
         const tx = getReq.result;
         tx.category_id = categoryId;
         tx.category_label = label;
-        tx.category_source = 'manual';
+        tx.category_source = "manual";
         tx.updated_at = nowIso();
         store.put(tx);
       }
@@ -1019,7 +1188,7 @@ async function recategorizeTransactions({ force = false } = {}) {
   let skippedManual = 0;
 
   // Load all transactions for processing (small local dataset)
-  const allTx = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+  const allTx = await withIDBStore("transactions", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return [...(data.transactions || [])];
     if (!store) return [];
     return new Promise((res) => {
@@ -1031,25 +1200,25 @@ async function recategorizeTransactions({ force = false } = {}) {
 
   const updates = [];
   for (const tx of allTx) {
-    if (!force && tx.category_source === 'manual') {
+    if (!force && tx.category_source === "manual") {
       skippedManual += 1;
       continue;
     }
     const newCatId = categorize({ title: tx.title, amountSatang: tx.amount }, rules);
     if (newCatId && newCatId !== tx.category_id) {
-      const newLabel = catMap.get(newCatId) || 'อื่น ๆ';
+      const newLabel = catMap.get(newCatId) || "อื่น ๆ";
       updates.push({
         id: tx.id,
         category_id: newCatId,
         category_label: newLabel,
-        category_source: 'rule',
+        category_source: "rule",
         updated_at: nowIso(),
       });
     }
   }
 
   if (updates.length > 0) {
-    await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
+    await withIDBStore("transactions", "readwrite", ({ store, useLS, data }) => {
       if (useLS || data) {
         const updateMap = new Map(updates.map((u) => [u.id, u]));
         data.transactions = (data.transactions || []).map((t) => {
@@ -1078,14 +1247,18 @@ async function recategorizeTransactions({ force = false } = {}) {
 
 async function importTransactions({ parsed, accountId }) {
   await init();
-  if (!accountId) throw new Error('กรุณาเลือกบัญชีปลายทาง');
+  if (!accountId) throw new Error("กรุณาเลือกบัญชีปลายทาง");
 
-  const account = await withIDBStore('accounts', 'readonly', ({ store, useLS, data }) => {
+  const account = await withIDBStore("accounts", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return (data.accounts || []).find((a) => a.id === accountId);
     if (!store) return null;
-    return new Promise((res) => { const r = store.get(accountId); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+    return new Promise((res) => {
+      const r = store.get(accountId);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    });
   });
-  if (!account) throw new Error('ไม่พบบัญชีปลายทางสำหรับนำเข้า');
+  if (!account) throw new Error("ไม่พบบัญชีปลายทางสำหรับนำเข้า");
 
   const rules = await getRules();
   const catMap = await getCategoryMap();
@@ -1094,7 +1267,7 @@ async function importTransactions({ parsed, accountId }) {
   const batchId = cryptoRandomId();
 
   // Fetch all existing transaction fingerprints in a single read pass
-  const existingFps = await withIDBStore('transactions', 'readonly', ({ store, useLS, data }) => {
+  const existingFps = await withIDBStore("transactions", "readonly", ({ store, useLS, data }) => {
     if (useLS || data) return new Set((data.transactions || []).map((t) => t.fingerprint));
     if (!store) return new Set();
     return new Promise((res) => {
@@ -1139,14 +1312,14 @@ async function importTransactions({ parsed, accountId }) {
       date: tx.date || importedAt.slice(0, 10),
       title: tx.title,
       category_id: categoryId,
-      source: 'statement',
+      source: "statement",
       income,
       expense,
       amount: tx.amountSatang,
       raw_amount: tx.amount,
       raw_row: tx.rowNumber,
       imported_at: importedAt,
-      category_label: catMap.get(categoryId) || 'อื่น ๆ',
+      category_label: catMap.get(categoryId) || "อื่น ๆ",
     });
 
     insertedAmount += tx.amountSatang;
@@ -1155,14 +1328,14 @@ async function importTransactions({ parsed, accountId }) {
   const imported = recordsToInsert.length;
 
   // 1. Create batch record
-  await withIDBStore('import_batches', 'readwrite', ({ store, useLS, data }) => {
+  await withIDBStore("import_batches", "readwrite", ({ store, useLS, data }) => {
     const rec = {
       id: batchId,
-      file_name: parsed.fileName || 'upload',
-      file_path: '',
+      file_name: parsed.fileName || "upload",
+      file_path: "",
       account_id: accountId,
-      encoding_used: parsed.encoding || 'UTF-8',
-      detected_bank: parsed.detectedBank || 'อัตโนมัติ',
+      encoding_used: parsed.encoding || "UTF-8",
+      detected_bank: parsed.detectedBank || "อัตโนมัติ",
       total_rows: parsed.transactions.length,
       imported_count: imported,
       skipped_count: skipped,
@@ -1179,7 +1352,7 @@ async function importTransactions({ parsed, accountId }) {
 
   // 2. Write all transaction records in bulk
   if (recordsToInsert.length > 0) {
-    await withIDBStore('transactions', 'readwrite', ({ store, useLS, data }) => {
+    await withIDBStore("transactions", "readwrite", ({ store, useLS, data }) => {
       if (useLS || data) {
         data.transactions = data.transactions || [];
         data.transactions.push(...recordsToInsert);
@@ -1194,7 +1367,7 @@ async function importTransactions({ parsed, accountId }) {
 
   // 3. Update account balance
   if (insertedAmount !== 0) {
-    await withIDBStore('accounts', 'readwrite', ({ store, useLS, data }) => {
+    await withIDBStore("accounts", "readwrite", ({ store, useLS, data }) => {
       if (useLS || data) {
         const acc = (data.accounts || []).find((a) => a.id === accountId);
         if (acc) {
@@ -1222,35 +1395,46 @@ async function exportTransactions() {
   await init();
   const txs = await getTransactions();
   if (!txs.length) {
-    throw new Error('ยังไม่มีธุรกรรมสำหรับ export');
+    throw new Error("ยังไม่มีธุรกรรมสำหรับ export");
   }
 
   const accounts = await getAccounts();
   const accMap = new Map(accounts.map((a) => [a.id, a]));
 
-  const header = ['date', 'title', 'category', 'account', 'institution', 'income_thb', 'expense_thb', 'source'];
+  const header = [
+    "date",
+    "title",
+    "category",
+    "account",
+    "institution",
+    "income_thb",
+    "expense_thb",
+    "source",
+  ];
   const lines = txs.map((row) => {
     const acc = accMap.get(row.account_id);
     const cells = [
       row.date,
       row.title,
-      row.category_label || '',
+      row.category_label || "",
       acc?.name || row.account_id,
-      acc?.institution || '',
+      acc?.institution || "",
       (row.income || 0) / 100,
       (row.expense || 0) / 100,
-      row.source || 'statement',
+      row.source || "statement",
     ];
-    return cells.map((v) => {
-      const s = String(v ?? '');
-      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    }).join(',');
+    return cells
+      .map((v) => {
+        const s = String(v ?? "");
+        return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      })
+      .join(",");
   });
 
-  const csv = '\uFEFF' + header.join(',') + '\n' + lines.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const csv = "\uFEFF" + header.join(",") + "\n" + lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   const fname = `findash-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
   a.href = url;
   a.download = fname;
@@ -1264,7 +1448,7 @@ async function exportTransactions() {
 
 // helper
 function cryptoRandomId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
@@ -1318,7 +1502,7 @@ const financeStore = {
 
   // For ImportPanel preview path
   async previewImport(file, _accountId) {
-    const { parseStatementFile } = await import('./statementParser.js');
+    const { parseStatementFile } = await import("./statementParser.js");
     const parsed = await parseStatementFile(file);
     // enrich preview with categorization (first N)
     const rules = await getRules();
@@ -1328,7 +1512,7 @@ const financeStore = {
       return {
         ...t,
         category_id: catId,
-        category_label: catMap.get(catId) || 'อื่น ๆ',
+        category_label: catMap.get(catId) || "อื่น ๆ",
       };
     });
     return {
@@ -1342,7 +1526,7 @@ const financeStore = {
   },
 
   async importFromFile(file, accountId) {
-    const { parseStatementFile } = await import('./statementParser.js');
+    const { parseStatementFile } = await import("./statementParser.js");
     const parsed = await parseStatementFile(file);
     const result = await importTransactions({ parsed, accountId });
     return {
@@ -1354,13 +1538,14 @@ const financeStore = {
   },
 
   async wipeAllData() {
+    initPromise = null;
     memoryFallback = null;
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== "undefined") {
       Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith('findash_')) localStorage.removeItem(key);
+        if (key.startsWith("findash_")) localStorage.removeItem(key);
       });
     }
-    if (typeof indexedDB !== 'undefined') {
+    if (typeof indexedDB !== "undefined") {
       if (dbPromise) {
         const db = await dbPromise;
         if (db) db.close();

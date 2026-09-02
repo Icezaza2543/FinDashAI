@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -10,10 +10,7 @@ import CashflowChart from "./components/CashflowChart";
 import ExpenseDonut from "./components/ExpenseDonut";
 import BudgetPanel from "./components/BudgetPanel";
 import TransactionTable from "./components/TransactionTable";
-import InsightPanel from "./components/InsightPanel";
 import ProfitabilityPanel from "./components/ProfitabilityPanel";
-import CategoryManager from "./components/CategoryManager";
-import ReportsAnalytics from "./components/ReportsAnalytics";
 import AccountForm from "./components/AccountForm";
 import BudgetForm from "./components/BudgetForm";
 import GoalForm from "./components/GoalForm";
@@ -21,6 +18,11 @@ import GoalForm from "./components/GoalForm";
 import { navItems } from "./data/filters";
 import { formatMoney } from "./utils/formatters";
 import financeStore from "./lib/financeStore";
+import { selectTransactions } from "./lib/dashboardSelectors";
+
+const CategoryManager = lazy(() => import("./components/CategoryManager"));
+const InsightPanel = lazy(() => import("./components/InsightPanel"));
+const ReportsAnalytics = lazy(() => import("./components/ReportsAnalytics"));
 
 const CATEGORY_LABEL_MAP = {}; // dynamic from store now; keep for ultra-legacy fallback only
 
@@ -47,31 +49,6 @@ const ACCOUNT_TYPE_LABELS = {
   credit: "บัตรเครดิต",
   cash: "เงินสด",
 };
-
-function matchesDateRange(dateStr, rangeId) {
-  if (rangeId === "all" || !dateStr) return true;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return true;
-
-  const now = new Date();
-  if (rangeId === "1m") {
-    const cutoff = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    return d >= cutoff;
-  }
-  if (rangeId === "3m") {
-    const cutoff = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
-    return d >= cutoff;
-  }
-  if (rangeId === "6m") {
-    const cutoff = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
-    return d >= cutoff;
-  }
-  if (rangeId === "this_year") {
-    const cutoff = new Date(now.getFullYear(), 0, 1);
-    return d >= cutoff;
-  }
-  return true;
-}
 
 function bahtToSatang(value) {
   const amount = Number(String(value || "0").replace(/,/g, ""));
@@ -114,6 +91,7 @@ export default function App() {
   const [source, setSource] = useState("all");
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [refreshCount, setRefreshCount] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [exportNote, setExportNote] = useState("");
@@ -144,8 +122,12 @@ export default function App() {
           financeStore.getBudgets ? financeStore.getBudgets().catch(() => []) : Promise.resolve([]),
           financeStore.getGoals ? financeStore.getGoals().catch(() => []) : Promise.resolve([]),
           financeStore.getTransactions().catch(() => []),
-          financeStore.getCategories ? financeStore.getCategories().catch(() => []) : Promise.resolve([]),
-          financeStore.getCategoryRules ? financeStore.getCategoryRules().catch(() => []) : Promise.resolve([]),
+          financeStore.getCategories
+            ? financeStore.getCategories().catch(() => [])
+            : Promise.resolve([]),
+          financeStore.getCategoryRules
+            ? financeStore.getCategoryRules().catch(() => [])
+            : Promise.resolve([]),
         ]);
 
         if (isMounted) {
@@ -210,7 +192,7 @@ export default function App() {
 
   const accountById = useMemo(
     () => new Map(realAccounts.map((item) => [item.id, item])),
-    [realAccounts],
+    [realAccounts]
   );
 
   const accountFilterOptions = useMemo(
@@ -221,7 +203,7 @@ export default function App() {
         label: item.institution ? `${item.name} · ${item.institution}` : item.name,
       })),
     ],
-    [realAccounts],
+    [realAccounts]
   );
 
   const activeNavLabel = navItems.find((item) => item.id === activeNav)?.label ?? "ภาพรวมการเงิน";
@@ -242,14 +224,17 @@ export default function App() {
             { id: "cat-other", label: "อื่น ๆ" },
           ]),
     ],
-    [realCategories],
+    [realCategories]
   );
 
   const normalizedTransactions = useMemo(() => {
     const catMap = new Map(realCategories.map((c) => [c.id, c.label]));
     return allTransactions.map((transaction) => {
       const categoryLabel =
-        transaction.category_label || catMap.get(transaction.category_id) || CATEGORY_LABEL_MAP[transaction.category_id] || "อื่น ๆ";
+        transaction.category_label ||
+        catMap.get(transaction.category_id) ||
+        CATEGORY_LABEL_MAP[transaction.category_id] ||
+        "อื่น ๆ";
       const accountInfo = accountById.get(transaction.account_id);
 
       return {
@@ -269,37 +254,24 @@ export default function App() {
     });
   }, [accountById, allTransactions, realCategories]);
 
-  const filteredTransactions = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const transactionSelection = useMemo(
+    () =>
+      selectTransactions(normalizedTransactions, {
+        account,
+        category,
+        range,
+        search: deferredSearch,
+        source,
+      }),
+    [account, category, deferredSearch, normalizedTransactions, range, source]
+  );
 
-    return normalizedTransactions.filter((row) => {
-      const rangeMatch = matchesDateRange(row.date, range);
-      const accountMatch = account === "all" || row.account === account;
-      const sourceMatch = source === "all" || row.source === source;
-      const categoryMatch = category === "all" || row.categoryId === category || row.category === category;
-      const searchMatch =
-        !query ||
-        [row.title, row.categoryLabel, row.accountLabel, row.account, row.source].some((value) =>
-          String(value || "").toLowerCase().includes(query),
-        );
-
-      return rangeMatch && accountMatch && sourceMatch && categoryMatch && searchMatch;
-    });
-  }, [account, category, normalizedTransactions, range, search, source]);
+  const filteredTransactions = transactionSelection.rows;
 
   const analyticTransactions = filteredTransactions;
 
   const realMetrics = useMemo(() => {
-    const filtered = normalizedTransactions.filter((row) => {
-      const rangeMatch = matchesDateRange(row.date, range);
-      const accountMatch = account === "all" || row.account === account;
-      const sourceMatch = source === "all" || row.source === source;
-      const categoryMatch = category === "all" || row.categoryId === category || row.category === category;
-      return rangeMatch && accountMatch && sourceMatch && categoryMatch;
-    });
-
-    const income = filtered.reduce((sum, row) => sum + (row.income || 0), 0);
-    const expense = filtered.reduce((sum, row) => sum + (row.expense || 0), 0);
+    const { income, expense } = transactionSelection;
     const currentBalance =
       account === "all"
         ? realAccounts.reduce((sum, item) => sum + (item.current_balance || 0), 0)
@@ -312,7 +284,7 @@ export default function App() {
       balance: currentBalance,
       savingsRate,
     };
-  }, [account, accountById, category, normalizedTransactions, range, realAccounts, source]);
+  }, [account, accountById, realAccounts, transactionSelection]);
 
   const metrics = useMemo(
     () => ({
@@ -321,7 +293,7 @@ export default function App() {
       balance: realMetrics.balance / 100,
       savingsRate: realMetrics.savingsRate,
     }),
-    [realMetrics],
+    [realMetrics]
   );
 
   const showNote = (message, timeout = 2200) => {
@@ -373,7 +345,11 @@ export default function App() {
   const refreshData = () => setRefreshCount((count) => count + 1);
 
   async function handleWipeData() {
-    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลทั้งหมด? การดำเนินการนี้ไม่สามารถเรียกคืนได้")) {
+    if (
+      window.confirm(
+        "คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลทั้งหมด? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+      )
+    ) {
       try {
         await financeStore.wipeAllData();
         window.location.reload();
@@ -561,13 +537,15 @@ export default function App() {
                 {renderAccountForm(
                   newAccountDraft,
                   (field, value) => setNewAccountDraft((draft) => ({ ...draft, [field]: value })),
-                  "เพิ่มบัญชี",
+                  "เพิ่มบัญชี"
                 )}
               </form>
 
               <div className="account-editor-list">
                 {realAccounts.length === 0 ? (
-                  <div className="panel-empty">ยังไม่มีบัญชี เพิ่มบัญชีแรกเพื่อเริ่มนำเข้า statement</div>
+                  <div className="panel-empty">
+                    ยังไม่มีบัญชี เพิ่มบัญชีแรกเพื่อเริ่มนำเข้า statement
+                  </div>
                 ) : (
                   realAccounts.map((item) => {
                     const draft = accountDrafts[item.id] || accountToDraft(item);
@@ -595,7 +573,7 @@ export default function App() {
                               ...drafts,
                               [item.id]: { ...draft, [field]: value },
                             })),
-                          "บันทึกบัญชี",
+                          "บันทึกบัญชี"
                         )}
                         <div className="editor-actions">
                           <small>{item.institution || "ยังไม่ได้ระบุธนาคาร/สถาบัน"}</small>
@@ -625,7 +603,10 @@ export default function App() {
               <div className="panel-header compact">
                 <div>
                   <h2>จัดการหมวดหมู่และกฎ</h2>
-                  <p>เพิ่ม/แก้ไข/ลบหมวดหมู่และกฎจับคู่ข้อความ (มีผลกับการนำเข้าถัดไปและสามารถปรับย้อนหลัง)</p>
+                  <p>
+                    เพิ่ม/แก้ไข/ลบหมวดหมู่และกฎจับคู่ข้อความ
+                    (มีผลกับการนำเข้าถัดไปและสามารถปรับย้อนหลัง)
+                  </p>
                 </div>
               </div>
               <CategoryManager
@@ -672,7 +653,7 @@ export default function App() {
                   {renderBudgetForm(
                     newBudgetDraft,
                     (field, value) => setNewBudgetDraft((draft) => ({ ...draft, [field]: value })),
-                    "เพิ่มงบ",
+                    "เพิ่มงบ"
                   )}
                 </form>
                 <div className="account-editor-list">
@@ -705,7 +686,7 @@ export default function App() {
                                 ...drafts,
                                 [item.id]: { ...draft, [field]: value },
                               })),
-                            "บันทึกงบ",
+                            "บันทึกงบ"
                           )}
                           <div className="editor-actions">
                             <small>หมวด {item.category_label}</small>
@@ -743,7 +724,7 @@ export default function App() {
               {renderGoalForm(
                 newGoalDraft,
                 (field, value) => setNewGoalDraft((draft) => ({ ...draft, [field]: value })),
-                "เพิ่มเป้าหมาย",
+                "เพิ่มเป้าหมาย"
               )}
             </form>
             <div className="goal-list">
@@ -774,7 +755,10 @@ export default function App() {
                             {formatMoney((item.target_amount || 0) / 100)}
                           </span>
                         </div>
-                        <div className="budget-meter" aria-label={`${item.label} สำเร็จ ${percent}%`}>
+                        <div
+                          className="budget-meter"
+                          aria-label={`${item.label} สำเร็จ ${percent}%`}
+                        >
                           <span style={{ width: `${percent}%` }} />
                         </div>
                         <b>{percent}%</b>
@@ -786,10 +770,12 @@ export default function App() {
                             ...drafts,
                             [item.id]: { ...draft, [field]: value },
                           })),
-                        "บันทึกเป้าหมาย",
+                        "บันทึกเป้าหมาย"
                       )}
                       <div className="editor-actions">
-                        <small>บันทึกเมื่อ {new Date(item.updated_at).toLocaleDateString("th-TH")}</small>
+                        <small>
+                          บันทึกเมื่อ {new Date(item.updated_at).toLocaleDateString("th-TH")}
+                        </small>
                         <button
                           className="danger-button"
                           type="button"
@@ -858,14 +844,23 @@ export default function App() {
                 <strong>{normalizedTransactions.length.toLocaleString("th-TH")} รายการ</strong>
               </article>
             </div>
-            <div className="editor-form" style={{ borderTop: "1px solid var(--line)", marginTop: "20px" }}>
+            <div
+              className="editor-form"
+              style={{ borderTop: "1px solid var(--line)", marginTop: "20px" }}
+            >
               <h3>จัดการข้อมูล</h3>
-              <p style={{ color: "var(--text-soft)", fontSize: "var(--text-sm)", marginBottom: "14px" }}>
+              <p
+                style={{
+                  color: "var(--text-soft)",
+                  fontSize: "var(--text-sm)",
+                  marginBottom: "14px",
+                }}
+              >
                 ลบข้อมูลทั้งหมดที่บันทึกไว้ในเบราว์เซอร์นี้
               </p>
-              <button 
-                className="danger-button" 
-                type="button" 
+              <button
+                className="danger-button"
+                type="button"
                 onClick={handleWipeData}
                 style={{ padding: "8px 16px", fontWeight: "700" }}
               >
@@ -904,7 +899,11 @@ export default function App() {
           onExport={handleExport}
           onImport={handleImportToggle}
         />
-        <div className="dashboard-content">{renderActiveView()}</div>
+        <div className="dashboard-content">
+          <Suspense fallback={<div className="panel panel-empty">กำลังโหลดมุมมอง…</div>}>
+            {renderActiveView()}
+          </Suspense>
+        </div>
       </main>
     </div>
   );

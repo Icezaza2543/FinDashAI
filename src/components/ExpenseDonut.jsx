@@ -1,56 +1,51 @@
+import { useMemo } from "react";
 import { PieChart } from "lucide-react";
 import { formatMoney } from "../utils/formatters";
 
+const CHART_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#6366f1", "#94a3b8"];
+
 export default function ExpenseDonut({ transactions = [] }) {
   const hasRealData = transactions.length > 0;
-
-  let categories = [];
-  let totalExpense = 0;
-
-  if (hasRealData) {
-    // รวมรายจ่ายตาม categoryLabel
+  const { categories, gradient, totalExpense } = useMemo(() => {
     const expenseByCategory = {};
 
-    transactions.forEach(tx => {
+    transactions.forEach((tx) => {
       if (tx.expense > 0) {
         const label = tx.categoryLabel || "อื่น ๆ";
-        if (!expenseByCategory[label]) {
-          expenseByCategory[label] = 0;
-        }
-        expenseByCategory[label] += tx.expense;
+        expenseByCategory[label] = (expenseByCategory[label] || 0) + tx.expense;
       }
     });
 
-    totalExpense = Object.values(expenseByCategory).reduce((a, b) => a + b, 0);
+    const nextTotalExpense = Object.values(expenseByCategory).reduce(
+      (sum, amount) => sum + amount,
+      0
+    );
+    const nextCategories =
+      nextTotalExpense > 0
+        ? Object.entries(expenseByCategory)
+            .map(([label, amount], index) => ({
+              label,
+              amount,
+              value: Math.round((amount / nextTotalExpense) * 1000) / 10,
+              color: CHART_COLORS[index % CHART_COLORS.length],
+            }))
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, 7)
+        : [];
 
-    if (totalExpense > 0) {
-      categories = Object.entries(expenseByCategory)
-        .map(([label, amount], index) => {
-          const value = Math.round((amount / totalExpense) * 1000) / 10; // 1 decimal
-          const colors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#6366f1", "#94a3b8"];
-          return {
-            label,
-            amount,
-            value,
-            color: colors[index % colors.length]
-          };
-        })
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 7); // แสดงสูงสุด 7 หมวด
-    }
-  }
+    let stop = 0;
+    const nextGradient = nextCategories
+      .map((item) => {
+        const start = stop;
+        stop += item.value;
+        return `${item.color} ${start}% ${stop}%`;
+      })
+      .join(", ");
+
+    return { categories: nextCategories, gradient: nextGradient, totalExpense: nextTotalExpense };
+  }, [transactions]);
 
   const hasExpenseData = categories.length > 0;
-
-  // สร้าง gradient สำหรับ donut
-  let stop = 0;
-  const gradient = categories
-    .map((item) => {
-      const start = stop;
-      stop += item.value;
-      return `${item.color} ${start}% ${stop}%`;
-    })
-    .join(", ");
 
   return (
     <section className="panel category-panel">

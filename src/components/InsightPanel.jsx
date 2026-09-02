@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { AlertTriangle, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { formatMoney } from "../utils/formatters";
 
@@ -11,7 +12,7 @@ function buildInsights(transactions) {
       income: summary.income + (transaction.income || 0),
       expense: summary.expense + (transaction.expense || 0),
     }),
-    { income: 0, expense: 0 },
+    { income: 0, expense: 0 }
   );
 
   const expenseByCategory = new Map();
@@ -69,7 +70,7 @@ function buildInsights(transactions) {
 }
 
 export default function InsightPanel({ transactions = [] }) {
-  const insightRows = buildInsights(transactions);
+  const insightRows = useMemo(() => buildInsights(transactions), [transactions]);
 
   return (
     <section className="panel insights-panel">

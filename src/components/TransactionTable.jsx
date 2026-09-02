@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CreditCard, Search, TrendingUp, Upload } from "lucide-react";
 import { categories as fallbackCategories } from "../data/filters";
 import { formatMoney } from "../utils/formatters";
@@ -10,9 +10,9 @@ function formatDateShort(isoDate) {
   try {
     const d = new Date(isoDate);
     if (isNaN(d.getTime())) return isoDate;
-    return d.toLocaleDateString("th-TH", { 
-      day: "numeric", 
-      month: "short" 
+    return d.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
     });
   } catch {
     return isoDate;
@@ -31,12 +31,22 @@ export default function TransactionTable({
   onTransactionCategoryChange,
 }) {
   const [hideCategorized, setHideCategorized] = useState(false);
-  const catOptions = (categories && categories.length > 0)
-    ? categories.map((c) => ({ id: c.id, label: c.label }))
-    : fallbackCategories.filter((c) => c.id !== "all");
+  const catOptions = useMemo(
+    () =>
+      categories.length > 0
+        ? categories.map((item) => ({ id: item.id, label: item.label }))
+        : fallbackCategories.filter((item) => item.id !== "all"),
+    [categories]
+  );
   const filterOptions = filterCategories?.length ? filterCategories : fallbackCategories;
-  
-  const displayedRows = hideCategorized ? rows.filter(r => r.categoryId === "cat-other" || !r.categoryId) : rows;
+
+  const displayedRows = useMemo(
+    () =>
+      hideCategorized
+        ? rows.filter((row) => row.categoryId === "cat-other" || !row.categoryId)
+        : rows,
+    [hideCategorized, rows]
+  );
 
   return (
     <section className="panel transaction-panel">
@@ -46,9 +56,19 @@ export default function TransactionTable({
           <p>{displayedRows.length} รายการตรงกับตัวกรอง</p>
         </div>
         <div className="table-actions">
-          <label className="toggle-field" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', cursor: 'pointer', color: 'var(--text-soft)' }}>
-            <input 
-              type="checkbox" 
+          <label
+            className="toggle-field"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "var(--text-xs)",
+              cursor: "pointer",
+              color: "var(--text-soft)",
+            }}
+          >
+            <input
+              type="checkbox"
               checked={hideCategorized}
               onChange={(e) => setHideCategorized(e.target.checked)}
             />
@@ -109,7 +129,9 @@ export default function TransactionTable({
                       title="เปลี่ยนหมวดหมู่สำหรับรายการนี้"
                     >
                       {catOptions.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
                       ))}
                     </select>
                   ) : (
